@@ -179,3 +179,32 @@ export function ensureSchema(): Promise<void> {
   }
   return bootstrapped;
 }
+
+// Cross-instance-safe one-time seed. Serverless spins up many server
+// instances concurrently; a naive "if empty then seed" races and instances
+// wipe each other. We serialise with a Postgres advisory lock held on a
+// single dedicated connection, and re-check emptiness inside the lock.
+const SEED_LOCK_KEY = 873214567;
+let seededOnce: Promise<void> | null = null;
+export function ensureSeeded(seedFn: () => Promise<void>): Promise<void> {
+  if (!seededOnce) {
+    seededOnce = (async () => {
+      const client = await pool.connect();
+      try {
+        await client.query("SELECT pg_advisory_lock($1)", [SEED_LOCK_KEY]);
+        const r = await client.query<{ c: number }>(
+          "SELECT count(*)::int AS c FROM agencies",
+        );
+        if ((r.rows[0]?.c ?? 0) === 0) {
+          await seedFn();
+        }
+      } finally {
+        await client
+          .query("SELECT pg_advisory_unlock($1)", [SEED_LOCK_KEY])
+          .catch(() => {});
+        client.release();
+      }
+    })();
+  }
+  return seededOnce;
+}

@@ -47,3 +47,4 @@ shiftcare.db-wal
 *.db
 *.db-shm
 *.db-wal
+.env*.local
