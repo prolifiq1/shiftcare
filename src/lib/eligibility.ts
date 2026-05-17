@@ -7,10 +7,10 @@ export type EligibilityCheck = {
   reasons: string[];
 };
 
-export function checkWorkerEligibility(workerId: string, shiftId: string): EligibilityCheck {
+export async function checkWorkerEligibility(workerId: string, shiftId: string): Promise<EligibilityCheck> {
   const reasons: string[] = [];
-  const worker = db.select().from(workers).where(eq(workers.id, workerId)).get();
-  const shift = db.select().from(shifts).where(eq(shifts.id, shiftId)).get();
+  const worker = (await db.select().from(workers).where(eq(workers.id, workerId)).get());
+  const shift = (await db.select().from(shifts).where(eq(shifts.id, shiftId)).get());
   if (!worker || !shift) return { eligible: false, reasons: ["Worker or shift not found"] };
 
   if (!worker.active) reasons.push("Worker is inactive");
@@ -19,7 +19,7 @@ export function checkWorkerEligibility(workerId: string, shiftId: string): Eligi
   const shiftDate = new Date(shift.date + "T00:00:00Z");
 
   // Compliance documents
-  const docs = db.select().from(workerDocuments).where(eq(workerDocuments.workerId, workerId)).all();
+  const docs = (await db.select().from(workerDocuments).where(eq(workerDocuments.workerId, workerId)).all());
   const requiredDocTypes = ["DBS_ENHANCED", "RIGHT_TO_WORK"];
   for (const t of requiredDocTypes) {
     const doc = docs.find((d) => d.documentType === t && d.status === "APPROVED");
@@ -34,7 +34,7 @@ export function checkWorkerEligibility(workerId: string, shiftId: string): Eligi
 
   // Training records vs shift requirement
   const requiredTraining: string[] = JSON.parse(shift.requiredTraining || "[]");
-  const trainings = db.select().from(trainingRecords).where(eq(trainingRecords.workerId, workerId)).all();
+  const trainings = (await db.select().from(trainingRecords).where(eq(trainingRecords.workerId, workerId)).all());
   for (const tr of requiredTraining) {
     const rec = trainings.find((t) => t.trainingType === tr);
     if (!rec) {
@@ -53,7 +53,7 @@ export function checkWorkerEligibility(workerId: string, shiftId: string): Eligi
   }
 
   // Conflict check: any confirmed booking on the same day overlapping
-  const myBookings = db
+  const myBookings = (await db
     .select()
     .from(bookings)
     .where(
@@ -63,9 +63,9 @@ export function checkWorkerEligibility(workerId: string, shiftId: string): Eligi
         ne(bookings.shiftId, shiftId)
       )
     )
-    .all();
+    .all());
   for (const b of myBookings) {
-    const other = db.select().from(shifts).where(eq(shifts.id, b.shiftId)).get();
+    const other = (await db.select().from(shifts).where(eq(shifts.id, b.shiftId)).get());
     if (!other) continue;
     if (overlaps(other, shift)) {
       reasons.push(`Conflicts with shift on ${other.date} ${other.startTime}-${other.endTime}`);

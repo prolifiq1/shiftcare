@@ -11,17 +11,17 @@ async function pickShift(formData: FormData) {
   "use server";
   const user = await requireWorker();
   const shiftId = String(formData.get("shiftId"));
-  const elig = checkWorkerEligibility(user.id, shiftId);
+  const elig = await checkWorkerEligibility(user.id, shiftId);
   if (!elig.eligible) {
     redirect(`/worker/shifts/${shiftId}?error=` + encodeURIComponent(elig.reasons.join("; ")));
   }
-  const shift = db.select().from(shifts).where(eq(shifts.id, shiftId)).get();
+  const shift = (await db.select().from(shifts).where(eq(shifts.id, shiftId)).get());
   if (!shift) redirect("/worker");
   if (shift!.workersFilled >= shift!.workersRequired) {
     redirect(`/worker/shifts/${shiftId}?error=Shift+just+filled`);
   }
   const status = shift!.assignmentMode === "APPROVAL_REQUIRED" ? "REQUESTED" : "APPROVED";
-  db.insert(bookings)
+  (await db.insert(bookings)
     .values({
       id: randomUUID(),
       shiftId,
@@ -31,11 +31,11 @@ async function pickShift(formData: FormData) {
       payRateSnapshot: shift!.payRate,
       approvedAt: status === "APPROVED" ? new Date() : null,
     })
-    .run();
+    .run());
   if (status === "APPROVED") {
     const filled = shift!.workersFilled + 1;
     const newStatus = filled >= shift!.workersRequired ? "FILLED" : "PARTIALLY_FILLED";
-    db.update(shifts).set({ workersFilled: filled, status: newStatus }).where(eq(shifts.id, shiftId)).run();
+    (await db.update(shifts).set({ workersFilled: filled, status: newStatus }).where(eq(shifts.id, shiftId)).run());
   }
   redirect("/worker/schedule");
 }
@@ -50,16 +50,16 @@ export default async function ShiftDetailWorker({
   const user = await requireWorker();
   const { id } = await params;
   const { error } = await searchParams;
-  const shift = db.select().from(shifts).where(eq(shifts.id, id)).get();
+  const shift = (await db.select().from(shifts).where(eq(shifts.id, id)).get());
   if (!shift) notFound();
-  const location = db.select().from(locations).where(eq(locations.id, shift.locationId)).get();
-  const client = db.select().from(clients).where(eq(clients.id, shift.clientId)).get();
-  const existing = db
+  const location = (await db.select().from(locations).where(eq(locations.id, shift.locationId)).get());
+  const client = (await db.select().from(clients).where(eq(clients.id, shift.clientId)).get());
+  const existing = (await db
     .select()
     .from(bookings)
     .where(and(eq(bookings.shiftId, id), eq(bookings.workerId, user.id)))
-    .get();
-  const elig = checkWorkerEligibility(user.id, id);
+    .get());
+  const elig = await checkWorkerEligibility(user.id, id);
 
   return (
     <>

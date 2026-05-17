@@ -10,12 +10,12 @@ export default async function BookingsList({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const tab = sp.tab || "requested";
 
-  const base = db.select({ b: bookings, s: shifts, u: users, c: clients })
+  const base = (await db.select({ b: bookings, s: shifts, u: users, c: clients })
     .from(bookings)
     .leftJoin(shifts, eq(shifts.id, bookings.shiftId))
     .leftJoin(users, eq(users.id, bookings.workerId))
     .leftJoin(clients, eq(clients.id, shifts.clientId))
-    .where(eq(bookings.agencyId, user.agencyId)).all();
+    .where(eq(bookings.agencyId, user.agencyId)).all());
 
   const filter = (statuses: string[]) => base.filter(r => statuses.includes(r.b.status));
   const tabs = [

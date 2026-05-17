@@ -27,23 +27,23 @@ async function confirmMfa(formData: FormData) {
   if (!secret) redirect("/admin/settings?mfa=missing");
   if (!verifyTotp(secret!, code)) redirect("/admin/settings?mfa=bad");
   const recoveryCodes = Array.from({ length: 8 }, () => randomBytes(5).toString("hex"));
-  db.update(users)
+  (await db.update(users)
     .set({ mfaEnabled: true, mfaSecret: secret, mfaRecoveryCodes: JSON.stringify(recoveryCodes) })
     .where(eq(users.id, user.id))
-    .run();
+    .run());
   c.delete(PENDING);
-  audit(user.id, user.agencyId, "mfa.enable");
+  await audit(user.id, user.agencyId, "mfa.enable");
   redirect("/admin/settings?mfa=ok");
 }
 
 async function disableMfa() {
   "use server";
   const user = await requireSession();
-  db.update(users)
+  (await db.update(users)
     .set({ mfaEnabled: false, mfaSecret: null, mfaRecoveryCodes: null })
     .where(eq(users.id, user.id))
-    .run();
-  audit(user.id, user.agencyId, "mfa.disable");
+    .run());
+  await audit(user.id, user.agencyId, "mfa.disable");
   redirect("/admin/settings?mfa=disabled");
 }
 
@@ -58,7 +58,7 @@ async function cancelMfa() {
 export default async function Settings({ searchParams }: { searchParams: Promise<{ mfa?: string }> }) {
   const sessionUser = await requireSession();
   const sp = await searchParams;
-  const u = db.select().from(users).where(eq(users.id, sessionUser.id)).get();
+  const u = (await db.select().from(users).where(eq(users.id, sessionUser.id)).get());
   if (!u) redirect("/login");
 
   const c = await cookies();

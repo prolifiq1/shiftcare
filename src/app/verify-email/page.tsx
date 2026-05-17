@@ -8,10 +8,10 @@ export default async function VerifyEmail({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   let ok: "VERIFIED" | "ALREADY" | "INVALID" | null = null;
   if (sp.token) {
-    const rec = db.select().from(emailVerifications).where(eq(emailVerifications.token, sp.token)).get();
+    const rec = (await db.select().from(emailVerifications).where(eq(emailVerifications.token, sp.token)).get());
     if (rec && !rec.usedAt && rec.expiresAt.getTime() > Date.now()) {
-      db.update(users).set({ emailVerifiedAt: new Date() }).where(eq(users.id, rec.userId)).run();
-      db.update(emailVerifications).set({ usedAt: new Date() }).where(eq(emailVerifications.id, rec.id)).run();
+      (await db.update(users).set({ emailVerifiedAt: new Date() }).where(eq(users.id, rec.userId)).run());
+      (await db.update(emailVerifications).set({ usedAt: new Date() }).where(eq(emailVerifications.id, rec.id)).run());
       ok = "VERIFIED";
     } else if (rec?.usedAt) ok = "ALREADY";
     else ok = "INVALID";

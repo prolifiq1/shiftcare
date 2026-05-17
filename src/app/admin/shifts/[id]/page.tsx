@@ -10,22 +10,22 @@ async function approveBooking(formData: FormData) {
   const user = await requireAdmin();
   const id = String(formData.get("bookingId"));
   const action = String(formData.get("action"));
-  const booking = db.select().from(bookings).where(eq(bookings.id, id)).get();
+  const booking = (await db.select().from(bookings).where(eq(bookings.id, id)).get());
   if (!booking) return;
-  const shift = db.select().from(shifts).where(eq(shifts.id, booking.shiftId)).get();
+  const shift = (await db.select().from(shifts).where(eq(shifts.id, booking.shiftId)).get());
   if (action === "approve") {
-    db.update(bookings).set({ status: "APPROVED", approvedAt: new Date(), approvedBy: user.id }).where(eq(bookings.id, id)).run();
+    (await db.update(bookings).set({ status: "APPROVED", approvedAt: new Date(), approvedBy: user.id }).where(eq(bookings.id, id)).run());
     if (shift) {
       const filled = shift.workersFilled + 1;
       const newStatus = filled >= shift.workersRequired ? "FILLED" : "PARTIALLY_FILLED";
-      db.update(shifts).set({ workersFilled: filled, status: newStatus }).where(eq(shifts.id, shift.id)).run();
+      (await db.update(shifts).set({ workersFilled: filled, status: newStatus }).where(eq(shifts.id, shift.id)).run());
     }
-    audit(user.id, user.agencyId, "booking.approve", { type: "booking", id });
-    notify(booking.workerId, { type: "BOOKING_APPROVED", title: "Booking confirmed", body: `Your shift on ${shift?.date} ${shift?.startTime}–${shift?.endTime} is confirmed.`, href: "/worker/schedule" });
+    await audit(user.id, user.agencyId, "booking.approve", { type: "booking", id });
+    await notify(booking.workerId, { type: "BOOKING_APPROVED", title: "Booking confirmed", body: `Your shift on ${shift?.date} ${shift?.startTime}–${shift?.endTime} is confirmed.`, href: "/worker/schedule" });
   } else {
-    db.update(bookings).set({ status: "REJECTED", cancelledAt: new Date(), cancellationReason: "Rejected by coordinator" }).where(eq(bookings.id, id)).run();
-    audit(user.id, user.agencyId, "booking.reject", { type: "booking", id });
-    notify(booking.workerId, { type: "BOOKING_REJECTED", title: "Booking declined", body: `Your request for ${shift?.date} ${shift?.startTime}–${shift?.endTime} was not approved.`, href: "/worker/schedule" });
+    (await db.update(bookings).set({ status: "REJECTED", cancelledAt: new Date(), cancellationReason: "Rejected by coordinator" }).where(eq(bookings.id, id)).run());
+    await audit(user.id, user.agencyId, "booking.reject", { type: "booking", id });
+    await notify(booking.workerId, { type: "BOOKING_REJECTED", title: "Booking declined", body: `Your request for ${shift?.date} ${shift?.startTime}–${shift?.endTime} was not approved.`, href: "/worker/schedule" });
   }
   redirect(`/admin/shifts/${booking.shiftId}`);
 }
@@ -34,8 +34,8 @@ async function publishShift(formData: FormData) {
   "use server";
   const user = await requireAdmin();
   const id = String(formData.get("shiftId"));
-  db.update(shifts).set({ status: "PUBLISHED", publishedAt: new Date() }).where(eq(shifts.id, id)).run();
-  audit(user.id, user.agencyId, "shift.publish", { type: "shift", id });
+  (await db.update(shifts).set({ status: "PUBLISHED", publishedAt: new Date() }).where(eq(shifts.id, id)).run());
+  await audit(user.id, user.agencyId, "shift.publish", { type: "shift", id });
   redirect(`/admin/shifts/${id}`);
 }
 
@@ -43,24 +43,24 @@ async function cancelShift(formData: FormData) {
   "use server";
   const user = await requireAdmin();
   const id = String(formData.get("shiftId"));
-  db.update(shifts).set({ status: "CANCELLED_BY_AGENCY" }).where(eq(shifts.id, id)).run();
-  const related = db.select().from(bookings).where(eq(bookings.shiftId, id)).all();
-  db.update(bookings).set({ status: "CANCELLED_BY_AGENCY", cancelledAt: new Date() }).where(eq(bookings.shiftId, id)).run();
-  for (const b of related) notify(b.workerId, { type: "SHIFT_CANCELLED", title: "Shift cancelled", body: "This shift has been cancelled by the agency.", href: "/worker/schedule" });
-  audit(user.id, user.agencyId, "shift.cancel", { type: "shift", id });
+  (await db.update(shifts).set({ status: "CANCELLED_BY_AGENCY" }).where(eq(shifts.id, id)).run());
+  const related = (await db.select().from(bookings).where(eq(bookings.shiftId, id)).all());
+  (await db.update(bookings).set({ status: "CANCELLED_BY_AGENCY", cancelledAt: new Date() }).where(eq(bookings.shiftId, id)).run());
+  for (const b of related) await notify(b.workerId, { type: "SHIFT_CANCELLED", title: "Shift cancelled", body: "This shift has been cancelled by the agency.", href: "/worker/schedule" });
+  await audit(user.id, user.agencyId, "shift.cancel", { type: "shift", id });
   redirect(`/admin/shifts/${id}`);
 }
 
 export default async function ShiftDetail({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireAdmin();
   const { id } = await params;
-  const shift = db.select().from(shifts).where(and(eq(shifts.id, id), eq(shifts.agencyId, user.agencyId))).get();
+  const shift = (await db.select().from(shifts).where(and(eq(shifts.id, id), eq(shifts.agencyId, user.agencyId))).get());
   if (!shift) notFound();
-  const location = db.select().from(locations).where(eq(locations.id, shift.locationId)).get();
-  const client = db.select().from(clients).where(eq(clients.id, shift.clientId)).get();
-  const shiftBookings = db.select({ b: bookings, u: users })
+  const location = (await db.select().from(locations).where(eq(locations.id, shift.locationId)).get());
+  const client = (await db.select().from(clients).where(eq(clients.id, shift.clientId)).get());
+  const shiftBookings = (await db.select({ b: bookings, u: users })
     .from(bookings).leftJoin(users, eq(users.id, bookings.workerId))
-    .where(eq(bookings.shiftId, id)).all();
+    .where(eq(bookings.shiftId, id)).all());
 
   return (
     <>

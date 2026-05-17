@@ -16,22 +16,22 @@ async function submitTimesheet(formData: FormData) {
   const mileage = Math.max(0, Number(formData.get("mileage") || 0));
   const notes = String(formData.get("notes") || "") || null;
 
-  const b = db.select().from(bookings).where(and(eq(bookings.id, bookingId), eq(bookings.workerId, user.id))).get();
+  const b = (await db.select().from(bookings).where(and(eq(bookings.id, bookingId), eq(bookings.workerId, user.id))).get());
   if (!b) redirect("/worker/schedule");
-  const s = db.select().from(shifts).where(eq(shifts.id, b!.shiftId)).get();
+  const s = (await db.select().from(shifts).where(eq(shifts.id, b!.shiftId)).get());
   if (!s) redirect("/worker/schedule");
 
   const payable = Math.max(0, workedMinutes - breakMinutes);
   const totalPay = (payable / 60) * (b!.payRateSnapshot ?? s!.payRate ?? 0);
 
-  const existing = db.select().from(timesheets).where(eq(timesheets.bookingId, bookingId)).get();
+  const existing = (await db.select().from(timesheets).where(eq(timesheets.bookingId, bookingId)).get());
   if (existing) {
-    db.update(timesheets)
+    (await db.update(timesheets)
       .set({ workedMinutes, breakMinutes, mileage, notes, totalPay, status: "SUBMITTED", submittedAt: new Date() })
       .where(eq(timesheets.id, existing.id))
-      .run();
+      .run());
   } else {
-    db.insert(timesheets)
+    (await db.insert(timesheets)
       .values({
         id: randomUUID(),
         bookingId,
@@ -46,15 +46,15 @@ async function submitTimesheet(formData: FormData) {
         status: "SUBMITTED",
         submittedAt: new Date(),
       })
-      .run();
+      .run());
   }
 
-  db.update(bookings).set({ status: "TIMESHEET_SUBMITTED" }).where(eq(bookings.id, bookingId)).run();
-  audit(user.id, user.agencyId, "timesheet.submit", { type: "booking", id: bookingId });
+  (await db.update(bookings).set({ status: "TIMESHEET_SUBMITTED" }).where(eq(bookings.id, bookingId)).run());
+  await audit(user.id, user.agencyId, "timesheet.submit", { type: "booking", id: bookingId });
 
   // Notify any admin in the agency? We notify a generic admin via createdBy of the shift (best effort).
   if (s!.createdBy) {
-    notify(s!.createdBy, {
+    await notify(s!.createdBy, {
       type: "TIMESHEET_SUBMITTED",
       title: "Timesheet submitted",
       body: `${user.firstName} ${user.lastName} · ${(workedMinutes / 60).toFixed(2)} hrs`,
@@ -68,12 +68,12 @@ async function submitTimesheet(formData: FormData) {
 export default async function SubmitTimesheet({ params }: { params: Promise<{ bookingId: string }> }) {
   const user = await requireWorker();
   const { bookingId } = await params;
-  const b = db.select().from(bookings).where(and(eq(bookings.id, bookingId), eq(bookings.workerId, user.id))).get();
+  const b = (await db.select().from(bookings).where(and(eq(bookings.id, bookingId), eq(bookings.workerId, user.id))).get());
   if (!b) notFound();
-  const s = db.select().from(shifts).where(eq(shifts.id, b.shiftId)).get();
+  const s = (await db.select().from(shifts).where(eq(shifts.id, b.shiftId)).get());
   if (!s) notFound();
-  const c = db.select().from(clients).where(eq(clients.id, s.clientId)).get();
-  const existing = db.select().from(timesheets).where(eq(timesheets.bookingId, bookingId)).get();
+  const c = (await db.select().from(clients).where(eq(clients.id, s.clientId)).get());
+  const existing = (await db.select().from(timesheets).where(eq(timesheets.bookingId, bookingId)).get());
 
   const defaultHours = b.checkInTime && b.checkOutTime
     ? Math.max(0, (b.checkOutTime.getTime() - b.checkInTime.getTime()) / 3600000)

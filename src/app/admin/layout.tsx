@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAdmin, logout } from "@/lib/auth";
+import { requireAdmin, logout, stopImpersonation } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { notifications, agencies } from "@/lib/schema";
@@ -10,6 +10,11 @@ async function logoutAction() {
   "use server";
   await logout();
   redirect("/login");
+}
+
+async function stopImpersonationAction() {
+  "use server";
+  await stopImpersonation();
 }
 
 const NAV: { href: string; label: string; icon: string; group?: string }[] = [
@@ -28,10 +33,10 @@ const NAV: { href: string; label: string; icon: string; group?: string }[] = [
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAdmin();
-  const agency = db.select().from(agencies).where(eq(agencies.id, user.agencyId)).get();
-  const unread = db.select().from(notifications)
+  const agency = (await db.select().from(agencies).where(eq(agencies.id, user.agencyId)).get());
+  const unread = (await db.select().from(notifications)
     .where(and(eq(notifications.userId, user.id), isNull(notifications.readAt)))
-    .orderBy(desc(notifications.createdAt)).limit(5).all();
+    .orderBy(desc(notifications.createdAt)).limit(5).all());
 
   const groups = Array.from(new Set(NAV.map(n => n.group!)));
   return (
@@ -72,7 +77,22 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <button className="h-btn h-btn-ghost h-btn-sm" title="Sign out">↗</button>
         </form>
       </aside>
-      <main className="flex-1 overflow-auto">{children}</main>
+      <main className="flex-1 overflow-auto">
+        {user.impersonatorId && (
+          <div
+            className="flex items-center justify-between px-8 py-2.5 text-sm"
+            style={{ background: "var(--status-warn-bg)", color: "var(--status-warn-fg)", borderBottom: "1px solid var(--status-warn-border)" }}
+          >
+            <span>
+              Viewing <strong>{agency?.name}</strong> as an impersonated admin (super-admin session).
+            </span>
+            <form action={stopImpersonationAction}>
+              <button className="h-btn h-btn-secondary h-btn-sm" type="submit">Stop impersonating</button>
+            </form>
+          </div>
+        )}
+        {children}
+      </main>
     </div>
   );
 }

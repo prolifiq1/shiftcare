@@ -10,7 +10,7 @@ export default async function WorkerHome() {
   const user = await requireWorker();
   const today = new Date().toISOString().slice(0, 10);
 
-  const candidates = db
+  const candidates = (await db
     .select({ s: shifts, l: locations, c: clients })
     .from(shifts)
     .leftJoin(locations, eq(locations.id, shifts.locationId))
@@ -23,9 +23,9 @@ export default async function WorkerHome() {
       ),
     )
     .orderBy(shifts.date, shifts.startTime)
-    .all();
+    .all());
 
-  const myBookings = db
+  const myBookings = (await db
     .select()
     .from(bookings)
     .where(
@@ -34,11 +34,18 @@ export default async function WorkerHome() {
         inArray(bookings.status, ["REQUESTED", "APPROVED", "ASSIGNED", "CHECKED_IN"]),
       ),
     )
-    .all();
+    .all());
   const bookedShiftIds = new Set(myBookings.map((b) => b.shiftId));
 
-  const open = candidates.filter(
-    ({ s }) => !bookedShiftIds.has(s.id) && s.workersFilled < s.workersRequired,
+  const open = await Promise.all(
+    candidates
+      .filter(({ s }) => !bookedShiftIds.has(s.id) && s.workersFilled < s.workersRequired)
+      .map(async ({ s, l, c }) => ({
+        s,
+        l,
+        c,
+        elig: await checkWorkerEligibility(user.id, s.id),
+      })),
   );
 
   return (
@@ -55,8 +62,7 @@ export default async function WorkerHome() {
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {open.map(({ s, l, c }) => {
-              const elig = checkWorkerEligibility(user.id, s.id);
+            {open.map(({ s, l, c, elig }) => {
               return (
                 <Link
                   key={s.id}

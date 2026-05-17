@@ -10,12 +10,12 @@ async function resetAction(formData: FormData) {
   const token = String(formData.get("token"));
   const password = String(formData.get("password") || "");
   if (password.length < 8) redirect(`/reset/${token}?error=` + encodeURIComponent("Password must be at least 8 characters."));
-  const rec = findPasswordReset(token);
+  const rec = await findPasswordReset(token);
   if (!rec || rec.usedAt || rec.expiresAt.getTime() < Date.now()) {
     redirect(`/reset/${token}?error=` + encodeURIComponent("This reset link is invalid or has expired."));
   }
-  db.update(users).set({ passwordHash: hashPassword(password), failedLoginCount: 0, lockedUntil: null }).where(eq(users.id, rec.userId)).run();
-  db.update(passwordResets).set({ usedAt: new Date() }).where(eq(passwordResets.id, rec.id)).run();
+  (await db.update(users).set({ passwordHash: hashPassword(password), failedLoginCount: 0, lockedUntil: null }).where(eq(users.id, rec.userId)).run());
+  (await db.update(passwordResets).set({ usedAt: new Date() }).where(eq(passwordResets.id, rec.id)).run());
   await logAuth("PWD_RESET_OK", { userId: rec.userId });
   redirect("/login?error=" + encodeURIComponent("Password updated. Sign in with your new password."));
 }
@@ -25,7 +25,7 @@ export default async function ResetPage({
 }: { params: Promise<{ token: string }>; searchParams: Promise<{ error?: string }> }) {
   const { token } = await params;
   const sp = await searchParams;
-  const rec = findPasswordReset(token);
+  const rec = await findPasswordReset(token);
   const invalid = !rec || rec.usedAt || rec.expiresAt.getTime() < Date.now();
   return (
     <div className="h-auth-shell">

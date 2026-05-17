@@ -6,9 +6,9 @@ import { Card, Avatar, Chip, Meta, PageHeader, Stat } from "@/lib/ui";
 
 export default async function Profile() {
   const user = await requireWorker();
-  const w = db.select().from(workers).where(eq(workers.id, user.id)).get();
-  const docs = db.select().from(workerDocuments).where(eq(workerDocuments.workerId, user.id)).all();
-  const trainings = db.select().from(trainingRecords).where(eq(trainingRecords.workerId, user.id)).all();
+  const w = (await db.select().from(workers).where(eq(workers.id, user.id)).get());
+  const docs = (await db.select().from(workerDocuments).where(eq(workerDocuments.workerId, user.id)).all());
+  const trainings = (await db.select().from(trainingRecords).where(eq(trainingRecords.workerId, user.id)).all());
   const types: string[] = JSON.parse(w?.workerTypes || "[]");
 
   return (

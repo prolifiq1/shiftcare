@@ -6,9 +6,9 @@ import { PageHeader, Card, EmptyState, LinkButton, Meta } from "@/lib/ui";
 
 export default async function ClientsList() {
   const user = await requireAdmin();
-  const cs = db.select().from(clients).where(eq(clients.agencyId, user.agencyId)).all();
-  const allLocations = db.select().from(locations).where(eq(locations.agencyId, user.agencyId)).all();
-  const allShifts = db.select().from(shifts).where(eq(shifts.agencyId, user.agencyId)).all();
+  const cs = (await db.select().from(clients).where(eq(clients.agencyId, user.agencyId)).all());
+  const allLocations = (await db.select().from(locations).where(eq(locations.agencyId, user.agencyId)).all());
+  const allShifts = (await db.select().from(shifts).where(eq(shifts.agencyId, user.agencyId)).all());
 
   return (
     <>

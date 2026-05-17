@@ -8,10 +8,10 @@ import { redirect } from "next/navigation";
 async function markAllRead() {
   "use server";
   const user = await requireSession();
-  db.update(notifications)
+  (await db.update(notifications)
     .set({ readAt: new Date() })
     .where(and(eq(notifications.userId, user.id), isNull(notifications.readAt)))
-    .run();
+    .run());
   redirect("/worker/notifications");
 }
 
@@ -19,22 +19,22 @@ async function open(formData: FormData) {
   "use server";
   const user = await requireSession();
   const id = String(formData.get("id"));
-  db.update(notifications)
+  (await db.update(notifications)
     .set({ readAt: new Date() })
     .where(and(eq(notifications.id, id), eq(notifications.userId, user.id)))
-    .run();
+    .run());
   const href = String(formData.get("href") || "/worker/notifications");
   redirect(href);
 }
 
 export default async function WorkerInbox() {
   const user = await requireWorker();
-  const rows = db
+  const rows = (await db
     .select()
     .from(notifications)
     .where(eq(notifications.userId, user.id))
     .orderBy(desc(notifications.createdAt))
-    .all();
+    .all());
   const unread = rows.filter((n) => !n.readAt).length;
 
   return (

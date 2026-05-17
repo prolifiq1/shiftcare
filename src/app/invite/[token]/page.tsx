@@ -13,32 +13,32 @@ async function acceptAction(formData: FormData) {
   const firstName = String(formData.get("firstName") || "");
   const lastName = String(formData.get("lastName") || "");
   if (password.length < 8) redirect(`/invite/${token}?error=` + encodeURIComponent("Password must be at least 8 characters."));
-  const inv = findInvite(token);
+  const inv = await findInvite(token);
   if (!inv || inv.acceptedAt || inv.expiresAt.getTime() < Date.now()) {
     redirect(`/invite/${token}?error=` + encodeURIComponent("This invite is invalid or has expired."));
   }
-  const existing = db.select().from(users).where(eq(users.email, inv.email)).get();
+  const existing = (await db.select().from(users).where(eq(users.email, inv.email)).get());
   if (existing) redirect(`/invite/${token}?error=` + encodeURIComponent("Account already exists — sign in instead."));
 
   const userId = randomUUID();
-  db.insert(users).values({
+  (await db.insert(users).values({
     id: userId, agencyId: inv.agencyId, email: inv.email,
     passwordHash: hashPassword(password),
     firstName: firstName || inv.firstName || "",
     lastName:  lastName  || inv.lastName  || "",
     role: inv.role, status: "ACTIVE",
     emailVerifiedAt: new Date(),
-  }).run();
+  }).run());
 
   if (inv.role === "WORKER") {
-    db.insert(workers).values({
+    (await db.insert(workers).values({
       id: userId, agencyId: inv.agencyId, workerTypes: '["SUPPORT_WORKER"]',
       complianceStatus: "INCOMPLETE", onboardingStatus: "PROFILE_INCOMPLETE",
-    }).run();
+    }).run());
   }
 
-  db.update(invites).set({ acceptedAt: new Date() }).where(eq(invites.id, inv.id)).run();
-  audit(userId, inv.agencyId, "invite.accept", { type: "user", id: userId }, { email: inv.email, role: inv.role });
+  (await db.update(invites).set({ acceptedAt: new Date() }).where(eq(invites.id, inv.id)).run());
+  await audit(userId, inv.agencyId, "invite.accept", { type: "user", id: userId }, { email: inv.email, role: inv.role });
   await logAuth("INVITE_ACCEPT", { userId, email: inv.email });
   await createSessionFor(userId);
   redirect(inv.role === "WORKER" ? "/worker" : "/admin");
@@ -49,7 +49,7 @@ export default async function InviteAcceptPage({
 }: { params: Promise<{ token: string }>; searchParams: Promise<{ error?: string }> }) {
   const { token } = await params;
   const sp = await searchParams;
-  const inv = findInvite(token);
+  const inv = await findInvite(token);
   const invalid = !inv || inv.acceptedAt || inv.expiresAt.getTime() < Date.now();
 
   return (

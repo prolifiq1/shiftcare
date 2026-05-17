@@ -9,12 +9,12 @@ async function approve(formData: FormData) {
   "use server";
   const user = await requireAdmin();
   const id = String(formData.get("id"));
-  const ts = db.select().from(timesheets).where(eq(timesheets.id, id)).get();
+  const ts = (await db.select().from(timesheets).where(eq(timesheets.id, id)).get());
   if (!ts) return;
-  db.update(timesheets).set({ status: "APPROVED", approvedAt: new Date(), approvedBy: user.id }).where(eq(timesheets.id, id)).run();
-  db.update(bookings).set({ status: "TIMESHEET_APPROVED" }).where(eq(bookings.id, ts.bookingId)).run();
-  audit(user.id, user.agencyId, "timesheet.approve", { type: "timesheet", id });
-  notify(ts.workerId, {
+  (await db.update(timesheets).set({ status: "APPROVED", approvedAt: new Date(), approvedBy: user.id }).where(eq(timesheets.id, id)).run());
+  (await db.update(bookings).set({ status: "TIMESHEET_APPROVED" }).where(eq(bookings.id, ts.bookingId)).run());
+  await audit(user.id, user.agencyId, "timesheet.approve", { type: "timesheet", id });
+  await notify(ts.workerId, {
     type: "TIMESHEET_APPROVED",
     title: "Timesheet approved",
     body: `Approved for ${(ts.workedMinutes / 60).toFixed(2)} hrs · £${ts.totalPay?.toFixed(2)}`,
@@ -28,11 +28,11 @@ async function dispute(formData: FormData) {
   const user = await requireAdmin();
   const id = String(formData.get("id"));
   const reason = String(formData.get("reason") || "Please review hours.");
-  const ts = db.select().from(timesheets).where(eq(timesheets.id, id)).get();
+  const ts = (await db.select().from(timesheets).where(eq(timesheets.id, id)).get());
   if (!ts) return;
-  db.update(timesheets).set({ status: "DISPUTED", disputeReason: reason }).where(eq(timesheets.id, id)).run();
-  audit(user.id, user.agencyId, "timesheet.dispute", { type: "timesheet", id }, { reason });
-  notify(ts.workerId, {
+  (await db.update(timesheets).set({ status: "DISPUTED", disputeReason: reason }).where(eq(timesheets.id, id)).run());
+  await audit(user.id, user.agencyId, "timesheet.dispute", { type: "timesheet", id }, { reason });
+  await notify(ts.workerId, {
     type: "TIMESHEET_DISPUTED",
     title: "Timesheet needs attention",
     body: reason,
@@ -46,7 +46,7 @@ export default async function Timesheets({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const tab = sp.tab || "submitted";
 
-  const base = db
+  const base = (await db
     .select({ t: timesheets, b: bookings, s: shifts, u: users, c: clients })
     .from(timesheets)
     .leftJoin(bookings, eq(bookings.id, timesheets.bookingId))
@@ -55,7 +55,7 @@ export default async function Timesheets({ searchParams }: { searchParams: Promi
     .leftJoin(clients, eq(clients.id, timesheets.clientId))
     .where(eq(timesheets.agencyId, user.agencyId))
     .orderBy(desc(timesheets.submittedAt))
-    .all();
+    .all());
 
   const filter = (statuses: string[]) => base.filter((r) => statuses.includes(r.t.status));
   const tabs = [

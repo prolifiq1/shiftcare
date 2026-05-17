@@ -9,7 +9,7 @@ import Link from "next/link";
 async function markAllRead() {
   "use server";
   const user = await requireSession();
-  db.update(notifications).set({ readAt: new Date() }).where(and(eq(notifications.userId, user.id), isNull(notifications.readAt))).run();
+  (await db.update(notifications).set({ readAt: new Date() }).where(and(eq(notifications.userId, user.id), isNull(notifications.readAt))).run());
   redirect("/admin/notifications");
 }
 
@@ -17,7 +17,7 @@ async function markRead(formData: FormData) {
   "use server";
   const user = await requireSession();
   const id = String(formData.get("id"));
-  db.update(notifications).set({ readAt: new Date() }).where(and(eq(notifications.id, id), eq(notifications.userId, user.id))).run();
+  (await db.update(notifications).set({ readAt: new Date() }).where(and(eq(notifications.id, id), eq(notifications.userId, user.id))).run());
   const href = String(formData.get("href") || "/admin/notifications");
   redirect(href);
 }
@@ -27,7 +27,7 @@ export default async function AdminNotifications({ searchParams }: { searchParam
   const sp = await searchParams;
   const tab = sp.tab || "unread";
 
-  const all = db.select().from(notifications).where(eq(notifications.userId, user.id)).orderBy(desc(notifications.createdAt)).all();
+  const all = (await db.select().from(notifications).where(eq(notifications.userId, user.id)).orderBy(desc(notifications.createdAt)).all());
   const unread = all.filter((n) => !n.readAt);
   const rows = tab === "unread" ? unread : all;
 

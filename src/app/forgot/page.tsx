@@ -9,10 +9,10 @@ import { Button, Field, Banner } from "@/lib/ui";
 async function forgotAction(formData: FormData) {
   "use server";
   const email = String(formData.get("email") || "").trim().toLowerCase();
-  const user = db.select().from(users).where(eq(users.email, email)).get();
+  const user = (await db.select().from(users).where(eq(users.email, email)).get());
   let token: string | null = null;
   if (user) {
-    token = createPasswordReset(user.id);
+    token = await createPasswordReset(user.id);
     await logAuth("PWD_RESET_REQ", { userId: user.id, email });
   }
   redirect(`/forgot?sent=1${token ? `&_t=${token}` : ""}`);

@@ -19,6 +19,7 @@ export type SessionUser = {
   id: string; agencyId: string; email: string;
   firstName: string; lastName: string; role: Role;
   emailVerified: boolean; mfaEnabled: boolean;
+  impersonatorId?: string | null;
 };
 
 async function ipUa() {
@@ -31,30 +32,30 @@ async function ipUa() {
 
 export async function logAuth(type: string, opts: { userId?: string | null; email?: string | null; meta?: object }) {
   const { ip, ua } = await ipUa();
-  db.insert(authEvents).values({
+  (await db.insert(authEvents).values({
     id: randomUUID(),
     userId: opts.userId ?? null,
     email: opts.email ?? null,
     type, ip, userAgent: ua,
     meta: opts.meta ? JSON.stringify(opts.meta) : null,
-  }).run();
+  }).run());
 }
 
-export function audit(actorId: string | null, agencyId: string | null, action: string, target?: { type: string; id: string }, meta?: object) {
-  db.insert(auditLogs).values({
+export async function audit(actorId: string | null, agencyId: string | null, action: string, target?: { type: string; id: string }, meta?: object) {
+  (await db.insert(auditLogs).values({
     id: randomUUID(),
     actorId, agencyId,
     action,
     targetType: target?.type ?? null,
     targetId: target?.id ?? null,
     meta: meta ? JSON.stringify(meta) : null,
-  }).run();
+  }).run());
 }
 
-export function notify(userId: string, n: { type: string; title: string; body?: string; href?: string }) {
-  db.insert(notifications).values({
+export async function notify(userId: string, n: { type: string; title: string; body?: string; href?: string }) {
+  (await db.insert(notifications).values({
     id: randomUUID(), userId, ...n,
-  }).run();
+  }).run());
 }
 
 /* ─── login / session ────────────────────────────────────────── */
@@ -64,7 +65,7 @@ export type LoginResult =
   | { ok: false; reason: "INVALID" | "LOCKED" | "SUSPENDED" | "UNVERIFIED" };
 
 export async function login(email: string, password: string): Promise<LoginResult> {
-  const user = db.select().from(users).where(eq(users.email, email.toLowerCase())).get();
+  const user = (await db.select().from(users).where(eq(users.email, email.toLowerCase())).get());
   if (!user) {
     await logAuth("LOGIN_FAIL", { email, meta: { reason: "no_user" } });
     return { ok: false, reason: "INVALID" };
@@ -86,13 +87,13 @@ export async function login(email: string, password: string): Promise<LoginResul
       update.failedLoginCount = 0;
       await logAuth("LOCKED", { userId: user.id, email });
     }
-    db.update(users).set(update).where(eq(users.id, user.id)).run();
+    (await db.update(users).set(update).where(eq(users.id, user.id)).run());
     await logAuth("LOGIN_FAIL", { userId: user.id, email });
     return { ok: false, reason: "INVALID" };
   }
 
   // reset failures
-  db.update(users).set({ failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() }).where(eq(users.id, user.id)).run();
+  (await db.update(users).set({ failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() }).where(eq(users.id, user.id)).run());
 
   if (user.mfaEnabled) {
     // Pending-MFA: short cookie holding userId; not a full session
@@ -109,11 +110,11 @@ export async function login(email: string, password: string): Promise<LoginResul
   return { ok: true, userId: user.id, mfaRequired: false };
 }
 
-export async function createSessionFor(userId: string) {
+export async function createSessionFor(userId: string, impersonatorId?: string | null) {
   const sessionId = randomUUID();
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 86400 * 1000);
   const { ip, ua } = await ipUa();
-  db.insert(sessions).values({ id: sessionId, userId, expiresAt, ip, userAgent: ua }).run();
+  (await db.insert(sessions).values({ id: sessionId, userId, impersonatorId: impersonatorId ?? null, expiresAt, ip, userAgent: ua }).run());
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, sessionId, { httpOnly: true, sameSite: "lax", expires: expiresAt, path: "/" });
 }
@@ -122,7 +123,7 @@ export async function verifyMfaAndLogin(code: string): Promise<boolean> {
   const cookieStore = await cookies();
   const userId = cookieStore.get("sc_pending_mfa")?.value;
   if (!userId) return false;
-  const user = db.select().from(users).where(eq(users.id, userId)).get();
+  const user = (await db.select().from(users).where(eq(users.id, userId)).get());
   if (!user || !user.mfaSecret) return false;
   const ok = verifyTotp(user.mfaSecret, code);
   if (!ok) {
@@ -139,9 +140,9 @@ export async function logout() {
   const cookieStore = await cookies();
   const sid = cookieStore.get(SESSION_COOKIE)?.value;
   if (sid) {
-    const s = db.select().from(sessions).where(eq(sessions.id, sid)).get();
+    const s = (await db.select().from(sessions).where(eq(sessions.id, sid)).get());
     if (s) await logAuth("LOGOUT", { userId: s.userId });
-    db.delete(sessions).where(eq(sessions.id, sid)).run();
+    (await db.delete(sessions).where(eq(sessions.id, sid)).run());
     cookieStore.delete(SESSION_COOKIE);
   }
 }
@@ -150,14 +151,15 @@ export async function getSession(): Promise<SessionUser | null> {
   const cookieStore = await cookies();
   const sid = cookieStore.get(SESSION_COOKIE)?.value;
   if (!sid) return null;
-  const session = db.select().from(sessions).where(eq(sessions.id, sid)).get();
+  const session = (await db.select().from(sessions).where(eq(sessions.id, sid)).get());
   if (!session || session.expiresAt.getTime() < Date.now()) return null;
-  const user = db.select().from(users).where(eq(users.id, session.userId)).get();
+  const user = (await db.select().from(users).where(eq(users.id, session.userId)).get());
   if (!user) return null;
   return {
     id: user.id, agencyId: user.agencyId, email: user.email,
     firstName: user.firstName, lastName: user.lastName, role: user.role as Role,
     emailVerified: !!user.emailVerifiedAt, mfaEnabled: !!user.mfaEnabled,
+    impersonatorId: session.impersonatorId ?? null,
   };
 }
 
@@ -174,58 +176,94 @@ export async function requireRole(...roles: Role[]): Promise<SessionUser> {
 }
 
 export async function requireAdmin(): Promise<SessionUser> {
-  return requireRole("AGENCY_ADMIN", "COORDINATOR", "COMPLIANCE", "FINANCE", "SUPER_ADMIN");
+  return requireRole("AGENCY_ADMIN", "COORDINATOR", "COMPLIANCE", "FINANCE");
 }
 export async function requireWorker(): Promise<SessionUser> {
   return requireRole("WORKER");
+}
+export async function requireSuperAdmin(): Promise<SessionUser> {
+  const s = await requireSession();
+  if (s.role !== "SUPER_ADMIN") redirect("/login");
+  return s;
+}
+
+/* ─── impersonation (super-admin → agency admin) ─────────────── */
+
+export async function startImpersonation(agencyId: string) {
+  const su = await requireSuperAdmin();
+  const target = (await db
+    .select()
+    .from(users)
+    .where(eq(users.agencyId, agencyId))
+    .all())
+    .find((u) => u.role === "AGENCY_ADMIN" && u.status === "ACTIVE");
+  if (!target) redirect("/platform?error=no_admin");
+  const cookieStore = await cookies();
+  const sid = cookieStore.get(SESSION_COOKIE)?.value;
+  if (sid) (await db.delete(sessions).where(eq(sessions.id, sid)).run());
+  await createSessionFor(target!.id, su.id);
+  await audit(su.id, agencyId, "platform.impersonate.start", { type: "agency", id: agencyId });
+  redirect("/admin");
+}
+
+export async function stopImpersonation() {
+  const cookieStore = await cookies();
+  const sid = cookieStore.get(SESSION_COOKIE)?.value;
+  if (!sid) redirect("/login");
+  const session = (await db.select().from(sessions).where(eq(sessions.id, sid!)).get());
+  if (!session?.impersonatorId) redirect("/admin");
+  (await db.delete(sessions).where(eq(sessions.id, sid!)).run());
+  await createSessionFor(session!.impersonatorId!);
+  await audit(session!.impersonatorId!, null, "platform.impersonate.stop");
+  redirect("/platform");
 }
 
 export function hashPassword(pw: string) { return bcrypt.hashSync(pw, 10); }
 
 /* ─── invites ────────────────────────────────────────────────── */
 
-export function createInvite(input: {
+export async function createInvite(input: {
   agencyId: string; email: string; role: Role; firstName?: string; lastName?: string; invitedBy: string;
 }) {
   const token = randomBytes(24).toString("hex");
   const id = randomUUID();
-  db.insert(invites).values({
+  (await db.insert(invites).values({
     id, ...input,
     email: input.email.toLowerCase(),
     token,
     expiresAt: new Date(Date.now() + 7 * 86400 * 1000),
-  }).run();
-  audit(input.invitedBy, input.agencyId, "invite.create", { type: "invite", id }, { email: input.email, role: input.role });
+  }).run());
+  await audit(input.invitedBy, input.agencyId, "invite.create", { type: "invite", id }, { email: input.email, role: input.role });
   return { id, token };
 }
 
-export function findInvite(token: string) {
-  return db.select().from(invites).where(eq(invites.token, token)).get();
+export async function findInvite(token: string) {
+  return (await db.select().from(invites).where(eq(invites.token, token)).get());
 }
 
 /* ─── password reset ─────────────────────────────────────────── */
 
-export function createPasswordReset(userId: string) {
+export async function createPasswordReset(userId: string) {
   const token = randomBytes(24).toString("hex");
-  db.insert(passwordResets).values({
+  (await db.insert(passwordResets).values({
     id: randomUUID(), userId, token,
     expiresAt: new Date(Date.now() + 30 * 60 * 1000),
-  }).run();
+  }).run());
   return token;
 }
 
-export function findPasswordReset(token: string) {
-  return db.select().from(passwordResets).where(eq(passwordResets.token, token)).get();
+export async function findPasswordReset(token: string) {
+  return (await db.select().from(passwordResets).where(eq(passwordResets.token, token)).get());
 }
 
 /* ─── email verification ─────────────────────────────────────── */
 
-export function createEmailVerification(userId: string) {
+export async function createEmailVerification(userId: string) {
   const token = randomBytes(20).toString("hex");
-  db.insert(emailVerifications).values({
+  (await db.insert(emailVerifications).values({
     id: randomUUID(), userId, token,
     expiresAt: new Date(Date.now() + 24 * 3600 * 1000),
-  }).run();
+  }).run());
   return token;
 }
 

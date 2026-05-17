@@ -28,12 +28,30 @@ const TONE_FG: Record<Tone, string> = {
 
 export default async function WorkersList() {
   const user = await requireAdmin();
-  const rows = db
+  const rows = (await db
     .select({ w: workers, u: users })
     .from(workers)
     .leftJoin(users, eq(users.id, workers.id))
     .where(eq(workers.agencyId, user.agencyId))
-    .all();
+    .all());
+
+  const now = Date.now();
+  const enriched = await Promise.all(
+    rows.map(async ({ w, u }) => {
+      const docs = await db
+        .select()
+        .from(workerDocuments)
+        .where(eq(workerDocuments.workerId, w.id))
+        .all();
+      const expired = docs.some((d) => d.expiryDate && d.expiryDate.getTime() < now);
+      const expiringSoon = docs.some((d) => {
+        if (!d.expiryDate) return false;
+        const days = (d.expiryDate.getTime() - now) / 86400000;
+        return days >= 0 && days < 30;
+      });
+      return { w, u, docsCount: docs.length, c: complianceTone(w.complianceStatus, expiringSoon, expired) };
+    }),
+  );
 
   const compliantCount = rows.filter((r) => r.w.complianceStatus === "COMPLIANT").length;
   const reliabilityAvg = rows.length
@@ -68,17 +86,8 @@ export default async function WorkersList() {
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ w, u }) => {
+              {enriched.map(({ w, u, docsCount, c }) => {
                 const types: string[] = JSON.parse(w.workerTypes || "[]");
-                const docs = db.select().from(workerDocuments).where(eq(workerDocuments.workerId, w.id)).all();
-                const now = Date.now();
-                const expired = docs.some((d) => d.expiryDate && d.expiryDate.getTime() < now);
-                const expiringSoon = docs.some((d) => {
-                  if (!d.expiryDate) return false;
-                  const days = (d.expiryDate.getTime() - now) / 86400000;
-                  return days >= 0 && days < 30;
-                });
-                const c = complianceTone(w.complianceStatus, expiringSoon, expired);
                 return (
                   <tr key={w.id}>
                     <td>
@@ -111,7 +120,7 @@ export default async function WorkersList() {
                         {c.label}
                       </span>
                     </td>
-                    <td className="h-num text-xs" style={{ color: "var(--text-muted)" }}>{docs.length}</td>
+                    <td className="h-num text-xs" style={{ color: "var(--text-muted)" }}>{docsCount}</td>
                     <td className="h-num">
                       <span
                         style={{

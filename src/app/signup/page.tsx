@@ -18,20 +18,20 @@ async function signupAction(formData: FormData) {
   if (!agencyName || !firstName || !email || password.length < 8 || !consent) {
     redirect("/signup?error=" + encodeURIComponent("Please fill all fields and accept the terms. Password must be 8+ characters."));
   }
-  const existing = db.select().from(users).where(eq(users.email, email)).get();
+  const existing = (await db.select().from(users).where(eq(users.email, email)).get());
   if (existing) redirect("/signup?error=" + encodeURIComponent("An account with this email already exists."));
 
   const agencyId = randomUUID();
-  db.insert(agencies).values({ id: agencyId, name: agencyName, slug: agencyName.toLowerCase().replace(/[^a-z0-9]+/g, "-") }).run();
+  (await db.insert(agencies).values({ id: agencyId, name: agencyName, slug: agencyName.toLowerCase().replace(/[^a-z0-9]+/g, "-") }).run());
   const userId = randomUUID();
-  db.insert(users).values({
+  (await db.insert(users).values({
     id: userId, agencyId, email,
     passwordHash: hashPassword(password),
     firstName, lastName, role: "AGENCY_ADMIN", status: "ACTIVE",
-  }).run();
+  }).run());
 
-  const token = createEmailVerification(userId);
-  audit(userId, agencyId, "agency.create", { type: "agency", id: agencyId }, { name: agencyName });
+  const token = await createEmailVerification(userId);
+  await audit(userId, agencyId, "agency.create", { type: "agency", id: agencyId }, { name: agencyName });
   await logAuth("SIGNUP", { userId, email });
   await createSessionFor(userId);
   redirect(`/verify-email?token=${token}&new=1`);

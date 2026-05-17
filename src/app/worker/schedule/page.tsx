@@ -10,10 +10,10 @@ async function checkIn(formData: FormData) {
   "use server";
   const user = await requireWorker();
   const id = String(formData.get("bookingId"));
-  db.update(bookings)
+  (await db.update(bookings)
     .set({ status: "CHECKED_IN", checkInTime: new Date() })
     .where(and(eq(bookings.id, id), eq(bookings.workerId, user.id)))
-    .run();
+    .run());
   redirect("/worker/schedule");
 }
 
@@ -21,10 +21,10 @@ async function checkOut(formData: FormData) {
   "use server";
   const user = await requireWorker();
   const id = String(formData.get("bookingId"));
-  db.update(bookings)
+  (await db.update(bookings)
     .set({ status: "CHECKED_OUT", checkOutTime: new Date() })
     .where(and(eq(bookings.id, id), eq(bookings.workerId, user.id)))
-    .run();
+    .run());
   redirect("/worker/schedule");
 }
 
@@ -32,26 +32,26 @@ async function cancelBooking(formData: FormData) {
   "use server";
   const user = await requireWorker();
   const id = String(formData.get("bookingId"));
-  const booking = db.select().from(bookings).where(and(eq(bookings.id, id), eq(bookings.workerId, user.id))).get();
+  const booking = (await db.select().from(bookings).where(and(eq(bookings.id, id), eq(bookings.workerId, user.id))).get());
   if (!booking) redirect("/worker/schedule");
   if (booking!.status === "APPROVED") {
-    const s = db.select().from(shifts).where(eq(shifts.id, booking!.shiftId)).get();
+    const s = (await db.select().from(shifts).where(eq(shifts.id, booking!.shiftId)).get());
     if (s) {
       const filled = Math.max(0, s.workersFilled - 1);
       const newStatus = filled === 0 ? "PUBLISHED" : "PARTIALLY_FILLED";
-      db.update(shifts).set({ workersFilled: filled, status: newStatus }).where(eq(shifts.id, s.id)).run();
+      (await db.update(shifts).set({ workersFilled: filled, status: newStatus }).where(eq(shifts.id, s.id)).run());
     }
   }
-  db.update(bookings)
+  (await db.update(bookings)
     .set({ status: "CANCELLED_BY_WORKER", cancelledAt: new Date(), cancellationReason: "Worker cancelled" })
     .where(eq(bookings.id, id))
-    .run();
+    .run());
   redirect("/worker/schedule");
 }
 
 export default async function MySchedule() {
   const user = await requireWorker();
-  const rows = db
+  const rows = (await db
     .select({ b: bookings, s: shifts, l: locations, c: clients })
     .from(bookings)
     .leftJoin(shifts, eq(shifts.id, bookings.shiftId))
@@ -59,7 +59,7 @@ export default async function MySchedule() {
     .leftJoin(clients, eq(clients.id, shifts.clientId))
     .where(eq(bookings.workerId, user.id))
     .orderBy(shifts.date)
-    .all();
+    .all());
 
   const upcoming = rows.filter(
     (r) =>

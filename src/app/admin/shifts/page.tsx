@@ -10,13 +10,13 @@ const STATUSES = ["DRAFT", "PUBLISHED", "PARTIALLY_FILLED", "FILLED", "CANCELLED
 export default async function ShiftsList({ searchParams }: { searchParams: Promise<{ status?: string; client?: string; from?: string }> }) {
   const user = await requireAdmin();
   const sp = await searchParams;
-  const all = db.select({ s: shifts, l: locations, c: clients })
+  const all = (await db.select({ s: shifts, l: locations, c: clients })
     .from(shifts)
     .leftJoin(locations, eq(locations.id, shifts.locationId))
     .leftJoin(clients, eq(clients.id, shifts.clientId))
     .where(eq(shifts.agencyId, user.agencyId))
     .orderBy(shifts.date, shifts.startTime)
-    .all();
+    .all());
 
   const clientList = Array.from(new Map(all.filter((r) => r.c).map((r) => [r.c!.id, r.c!.name])).entries());
   const rows = all.filter((r) => {

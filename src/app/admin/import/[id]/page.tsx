@@ -12,9 +12,9 @@ async function publishBatch(formData: FormData) {
   "use server";
   const user = await requireAdmin();
   const batchId = String(formData.get("batchId"));
-  const batch = db.select().from(importBatches).where(and(eq(importBatches.id, batchId), eq(importBatches.agencyId, user.agencyId))).get();
+  const batch = (await db.select().from(importBatches).where(and(eq(importBatches.id, batchId), eq(importBatches.agencyId, user.agencyId))).get());
   if (!batch) redirect("/admin/import");
-  const rows = db.select().from(importRows).where(eq(importRows.batchId, batchId)).all();
+  const rows = (await db.select().from(importRows).where(eq(importRows.batchId, batchId)).all());
 
   let published = 0;
   for (const row of rows) {
@@ -23,22 +23,22 @@ async function publishBatch(formData: FormData) {
     if (!n.date || !n.startTime || !n.endTime) continue;
 
     const clientName = n.client?.trim() || n.provider?.trim() || "Unknown";
-    let client = db.select().from(clients).where(and(eq(clients.agencyId, user.agencyId), eq(clients.name, clientName))).get();
+    let client = (await db.select().from(clients).where(and(eq(clients.agencyId, user.agencyId), eq(clients.name, clientName))).get());
     if (!client) {
       const cid = randomUUID();
-      db.insert(clients).values({ id: cid, agencyId: user.agencyId, name: clientName, active: true }).run();
-      client = db.select().from(clients).where(eq(clients.id, cid)).get()!;
+      (await db.insert(clients).values({ id: cid, agencyId: user.agencyId, name: clientName, active: true }).run());
+      client = (await db.select().from(clients).where(eq(clients.id, cid)).get())!;
     }
 
     const locName = n.client || n.address || "Default";
-    let location = db
+    let location = (await db
       .select()
       .from(locations)
       .where(and(eq(locations.agencyId, user.agencyId), eq(locations.clientId, client.id), eq(locations.name, locName)))
-      .get();
+      .get());
     if (!location) {
       const lid = randomUUID();
-      db.insert(locations)
+      (await db.insert(locations)
         .values({
           id: lid,
           agencyId: user.agencyId,
@@ -48,12 +48,12 @@ async function publishBatch(formData: FormData) {
           postcode: n.postcode ?? null,
           active: true,
         })
-        .run();
-      location = db.select().from(locations).where(eq(locations.id, lid)).get()!;
+        .run());
+      location = (await db.select().from(locations).where(eq(locations.id, lid)).get())!;
     }
 
     const shiftId = randomUUID();
-    db.insert(shifts)
+    (await db.insert(shifts)
       .values({
         id: shiftId,
         agencyId: user.agencyId,
@@ -79,13 +79,13 @@ async function publishBatch(formData: FormData) {
         publishedAt: new Date(),
         createdBy: user.id,
       })
-      .run();
-    db.update(importRows).set({ mappedShiftId: shiftId, action: "APPROVED" }).where(eq(importRows.id, row.id)).run();
+      .run());
+    (await db.update(importRows).set({ mappedShiftId: shiftId, action: "APPROVED" }).where(eq(importRows.id, row.id)).run());
     published++;
   }
 
-  db.update(importBatches).set({ status: "PUBLISHED", publishedRows: published }).where(eq(importBatches.id, batchId)).run();
-  audit(user.id, user.agencyId, "import.publish", { type: "importBatch", id: batchId }, { published });
+  (await db.update(importBatches).set({ status: "PUBLISHED", publishedRows: published }).where(eq(importBatches.id, batchId)).run());
+  await audit(user.id, user.agencyId, "import.publish", { type: "importBatch", id: batchId }, { published });
   redirect(`/admin/import/${batchId}?published=${published}`);
 }
 
@@ -96,17 +96,17 @@ async function saveTemplate(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   if (!name) redirect(`/admin/import/${batchId}?tmpl=name`);
 
-  const batch = db.select().from(importBatches).where(and(eq(importBatches.id, batchId), eq(importBatches.agencyId, user.agencyId))).get();
+  const batch = (await db.select().from(importBatches).where(and(eq(importBatches.id, batchId), eq(importBatches.agencyId, user.agencyId))).get());
   if (!batch) redirect("/admin/import");
 
   // fingerprint from first row's headers
-  const sample = db.select().from(importRows).where(eq(importRows.batchId, batchId)).limit(1).all()[0];
+  const sample = (await db.select().from(importRows).where(eq(importRows.batchId, batchId)).limit(1).all())[0];
   const headers = sample ? Object.keys(JSON.parse(sample.rawData)) : [];
   const { createHash } = await import("crypto");
   const fp = createHash("sha1").update(headers.map((h) => h.trim().toLowerCase()).sort().join("|")).digest("hex").slice(0, 16);
 
   const id = randomUUID();
-  db.insert(importTemplates)
+  (await db.insert(importTemplates)
     .values({
       id,
       agencyId: user.agencyId,
@@ -119,9 +119,9 @@ async function saveTemplate(formData: FormData) {
       lastUsedAt: new Date(),
       createdBy: user.id,
     })
-    .run();
-  db.update(importBatches).set({ templateId: id }).where(eq(importBatches.id, batchId)).run();
-  audit(user.id, user.agencyId, "importTemplate.create", { type: "importTemplate", id }, { name });
+    .run());
+  (await db.update(importBatches).set({ templateId: id }).where(eq(importBatches.id, batchId)).run());
+  await audit(user.id, user.agencyId, "importTemplate.create", { type: "importTemplate", id }, { name });
   redirect(`/admin/import/${batchId}?tmpl=ok`);
 }
 
@@ -136,9 +136,9 @@ export default async function ImportReview({
   const { id } = await params;
   const sp = await searchParams;
   const tab = sp.tab || "all";
-  const batch = db.select().from(importBatches).where(and(eq(importBatches.id, id), eq(importBatches.agencyId, user.agencyId))).get();
+  const batch = (await db.select().from(importBatches).where(and(eq(importBatches.id, id), eq(importBatches.agencyId, user.agencyId))).get());
   if (!batch) notFound();
-  const allRows = db.select().from(importRows).where(eq(importRows.batchId, id)).orderBy(importRows.rowNumber).all();
+  const allRows = (await db.select().from(importRows).where(eq(importRows.batchId, id)).orderBy(importRows.rowNumber).all());
   const rows =
     tab === "all"
       ? allRows

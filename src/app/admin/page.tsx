@@ -11,27 +11,27 @@ export default async function AdminDashboard() {
   const in14 = new Date(Date.now() + 14 * 86400 * 1000).toISOString().slice(0, 10);
   const in30ms = Date.now() + 30 * 86400 * 1000;
 
-  const upcoming = db.select().from(shifts)
+  const upcoming = (await db.select().from(shifts)
     .where(and(eq(shifts.agencyId, user.agencyId), gte(shifts.date, today), lte(shifts.date, in14)))
-    .orderBy(shifts.date).limit(12).all();
+    .orderBy(shifts.date).limit(12).all());
 
-  const all = db.select().from(shifts).where(eq(shifts.agencyId, user.agencyId)).all();
+  const all = (await db.select().from(shifts).where(eq(shifts.agencyId, user.agencyId)).all());
   const totalSlots = all.reduce((s, x) => s + x.workersRequired, 0);
   const filledSlots = all.reduce((s, x) => s + x.workersFilled, 0);
   const fillRate = totalSlots ? Math.round((filledSlots / totalSlots) * 100) : 0;
   const openSlots = totalSlots - filledSlots;
 
-  const pendingBookings = db.select({ c: sql<number>`count(*)` }).from(bookings)
-    .where(and(eq(bookings.agencyId, user.agencyId), eq(bookings.status, "REQUESTED"))).get()?.c ?? 0;
+  const pendingBookings = (await db.select({ c: sql<number>`count(*)` }).from(bookings)
+    .where(and(eq(bookings.agencyId, user.agencyId), eq(bookings.status, "REQUESTED"))).get())?.c ?? 0;
 
-  const pendingTimesheets = db.select({ c: sql<number>`count(*)` }).from(timesheets)
-    .where(and(eq(timesheets.agencyId, user.agencyId), eq(timesheets.status, "SUBMITTED"))).get()?.c ?? 0;
+  const pendingTimesheets = (await db.select({ c: sql<number>`count(*)` }).from(timesheets)
+    .where(and(eq(timesheets.agencyId, user.agencyId), eq(timesheets.status, "SUBMITTED"))).get())?.c ?? 0;
 
-  const totalWorkers = db.select({ c: sql<number>`count(*)` }).from(workers)
-    .where(eq(workers.agencyId, user.agencyId)).get()?.c ?? 0;
+  const totalWorkers = (await db.select({ c: sql<number>`count(*)` }).from(workers)
+    .where(eq(workers.agencyId, user.agencyId)).get())?.c ?? 0;
 
-  const expiringDocs = db.select().from(workerDocuments)
-    .where(and(lte(workerDocuments.expiryDate, new Date(in30ms)), gte(workerDocuments.expiryDate, new Date()))).all();
+  const expiringDocs = (await db.select().from(workerDocuments)
+    .where(and(lte(workerDocuments.expiryDate, new Date(in30ms)), gte(workerDocuments.expiryDate, new Date()))).all());
 
   return (
     <>

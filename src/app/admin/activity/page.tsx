@@ -35,14 +35,14 @@ export default async function ActivityLog({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const tab = sp.tab || "all";
 
-  const all = db
+  const all = (await db
     .select({ a: auditLogs, u: users })
     .from(auditLogs)
     .leftJoin(users, eq(users.id, auditLogs.actorId))
     .where(eq(auditLogs.agencyId, user.agencyId))
     .orderBy(desc(auditLogs.createdAt))
     .limit(500)
-    .all();
+    .all());
 
   const filterFn = (g: string) => (r: (typeof all)[number]) => (ACTION_GROUP[r.a.action] ?? "system") === g;
   const counts = {

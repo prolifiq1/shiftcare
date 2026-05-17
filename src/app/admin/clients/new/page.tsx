@@ -13,13 +13,13 @@ async function createClient(formData: FormData) {
   const organisationType = String(formData.get("organisationType") || "SUPPORTED_LIVING");
 
   const clientId = randomUUID();
-  db.insert(clients)
+  (await db.insert(clients)
     .values({ id: clientId, agencyId: user.agencyId, name, organisationType, active: true })
-    .run();
+    .run());
 
   const locName = String(formData.get("locName") || "").trim();
   if (locName) {
-    db.insert(locations)
+    (await db.insert(locations)
       .values({
         id: randomUUID(),
         agencyId: user.agencyId,
@@ -32,10 +32,10 @@ async function createClient(formData: FormData) {
         contactPhone: String(formData.get("contactPhone") || "") || null,
         active: true,
       })
-      .run();
+      .run());
   }
 
-  audit(user.id, user.agencyId, "client.create", { type: "client", id: clientId }, { name });
+  await audit(user.id, user.agencyId, "client.create", { type: "client", id: clientId }, { name });
   redirect("/admin/clients");
 }
 

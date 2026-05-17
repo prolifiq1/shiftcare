@@ -1,18 +1,19 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
-import { sql } from "drizzle-orm";
+import { pgTable, text, integer, real, boolean, timestamp } from "drizzle-orm/pg-core";
 
 const id = () => text("id").primaryKey();
-const ts = (name: string) =>
-  integer(name, { mode: "timestamp" }).default(sql`(unixepoch())`);
+const ts = (name: string) => timestamp(name, { mode: "date" }).defaultNow();
+const tsNull = (name: string) => timestamp(name, { mode: "date" });
 
-export const agencies = sqliteTable("agencies", {
+export const agencies = pgTable("agencies", {
   id: id(),
   name: text("name").notNull(),
   slug: text("slug"),
+  status: text("status").notNull().default("ACTIVE"), // ACTIVE | SUSPENDED
+  plan: text("plan").default("TRIAL"),
   createdAt: ts("created_at"),
 });
 
-export const users = sqliteTable("users", {
+export const users = pgTable("users", {
   id: id(),
   agencyId: text("agency_id").notNull(),
   email: text("email").notNull().unique(),
@@ -22,17 +23,17 @@ export const users = sqliteTable("users", {
   phone: text("phone"),
   role: text("role").notNull(),
   status: text("status").notNull().default("ACTIVE"),
-  emailVerifiedAt: integer("email_verified_at", { mode: "timestamp" }),
-  mfaEnabled: integer("mfa_enabled", { mode: "boolean" }).default(false),
+  emailVerifiedAt: tsNull("email_verified_at"),
+  mfaEnabled: boolean("mfa_enabled").default(false),
   mfaSecret: text("mfa_secret"),
   mfaRecoveryCodes: text("mfa_recovery_codes"),
-  lastLoginAt: integer("last_login_at", { mode: "timestamp" }),
+  lastLoginAt: tsNull("last_login_at"),
   failedLoginCount: integer("failed_login_count").default(0),
-  lockedUntil: integer("locked_until", { mode: "timestamp" }),
+  lockedUntil: tsNull("locked_until"),
   createdAt: ts("created_at"),
 });
 
-export const invites = sqliteTable("invites", {
+export const invites = pgTable("invites", {
   id: id(),
   agencyId: text("agency_id").notNull(),
   email: text("email").notNull(),
@@ -41,50 +42,50 @@ export const invites = sqliteTable("invites", {
   lastName: text("last_name"),
   token: text("token").notNull().unique(),
   invitedBy: text("invited_by").notNull(),
-  acceptedAt: integer("accepted_at", { mode: "timestamp" }),
-  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  acceptedAt: tsNull("accepted_at"),
+  expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
   createdAt: ts("created_at"),
 });
 
-export const passwordResets = sqliteTable("password_resets", {
+export const passwordResets = pgTable("password_resets", {
   id: id(),
   userId: text("user_id").notNull(),
   token: text("token").notNull().unique(),
-  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
-  usedAt: integer("used_at", { mode: "timestamp" }),
+  expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+  usedAt: tsNull("used_at"),
   createdAt: ts("created_at"),
 });
 
-export const emailVerifications = sqliteTable("email_verifications", {
+export const emailVerifications = pgTable("email_verifications", {
   id: id(),
   userId: text("user_id").notNull(),
   token: text("token").notNull().unique(),
-  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
-  usedAt: integer("used_at", { mode: "timestamp" }),
+  expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+  usedAt: tsNull("used_at"),
   createdAt: ts("created_at"),
 });
 
-export const authEvents = sqliteTable("auth_events", {
+export const authEvents = pgTable("auth_events", {
   id: id(),
   userId: text("user_id"),
   email: text("email"),
-  type: text("type").notNull(), // LOGIN_OK, LOGIN_FAIL, MFA_OK, MFA_FAIL, PWD_RESET_REQ, INVITE_ACCEPT, LOGOUT, LOCKED
+  type: text("type").notNull(),
   ip: text("ip"),
   userAgent: text("user_agent"),
   meta: text("meta"),
   createdAt: ts("created_at"),
 });
 
-export const clients = sqliteTable("clients", {
+export const clients = pgTable("clients", {
   id: id(),
   agencyId: text("agency_id").notNull(),
   name: text("name").notNull(),
   organisationType: text("organisation_type"),
-  active: integer("active", { mode: "boolean" }).default(true),
+  active: boolean("active").default(true),
   createdAt: ts("created_at"),
 });
 
-export const locations = sqliteTable("locations", {
+export const locations = pgTable("locations", {
   id: id(),
   agencyId: text("agency_id").notNull(),
   clientId: text("client_id").notNull(),
@@ -96,48 +97,48 @@ export const locations = sqliteTable("locations", {
   longitude: real("longitude"),
   contactName: text("contact_name"),
   contactPhone: text("contact_phone"),
-  active: integer("active", { mode: "boolean" }).default(true),
+  active: boolean("active").default(true),
   createdAt: ts("created_at"),
 });
 
-export const workers = sqliteTable("workers", {
+export const workers = pgTable("workers", {
   id: id(),
   agencyId: text("agency_id").notNull(),
   homePostcode: text("home_postcode"),
   homeLat: real("home_lat"),
   homeLng: real("home_lng"),
   workerTypes: text("worker_types").default("[]"),
-  drivingLicence: integer("driving_licence", { mode: "boolean" }).default(false),
-  ownCar: integer("own_car", { mode: "boolean" }).default(false),
+  drivingLicence: boolean("driving_licence").default(false),
+  ownCar: boolean("own_car").default(false),
   maxDistanceMiles: integer("max_distance_miles").default(20),
   maxWeeklyHours: integer("max_weekly_hours").default(48),
   reliabilityScore: real("reliability_score").default(100),
   complianceStatus: text("compliance_status").default("INCOMPLETE"),
   onboardingStatus: text("onboarding_status").default("APPROVED"),
-  active: integer("active", { mode: "boolean" }).default(true),
+  active: boolean("active").default(true),
 });
 
-export const workerDocuments = sqliteTable("worker_documents", {
+export const workerDocuments = pgTable("worker_documents", {
   id: id(),
   workerId: text("worker_id").notNull(),
   documentType: text("document_type").notNull(),
   reference: text("reference"),
-  issuedDate: integer("issued_date", { mode: "timestamp" }),
-  expiryDate: integer("expiry_date", { mode: "timestamp" }),
+  issuedDate: tsNull("issued_date"),
+  expiryDate: tsNull("expiry_date"),
   status: text("status").notNull().default("APPROVED"),
   createdAt: ts("created_at"),
 });
 
-export const trainingRecords = sqliteTable("training_records", {
+export const trainingRecords = pgTable("training_records", {
   id: id(),
   workerId: text("worker_id").notNull(),
   trainingType: text("training_type").notNull(),
-  completedDate: integer("completed_date", { mode: "timestamp" }),
-  expiryDate: integer("expiry_date", { mode: "timestamp" }),
+  completedDate: tsNull("completed_date"),
+  expiryDate: tsNull("expiry_date"),
   createdAt: ts("created_at"),
 });
 
-export const shifts = sqliteTable("shifts", {
+export const shifts = pgTable("shifts", {
   id: id(),
   agencyId: text("agency_id").notNull(),
   clientId: text("client_id").notNull(),
@@ -147,7 +148,7 @@ export const shifts = sqliteTable("shifts", {
   endDate: text("end_date").notNull(),
   startTime: text("start_time").notNull(),
   endTime: text("end_time").notNull(),
-  overnight: integer("overnight", { mode: "boolean" }).default(false),
+  overnight: boolean("overnight").default(false),
   durationMinutes: integer("duration_minutes").notNull(),
   shiftType: text("shift_type").notNull(),
   shiftTypeRaw: text("shift_type_raw"),
@@ -161,27 +162,27 @@ export const shifts = sqliteTable("shifts", {
   requiredTraining: text("required_training").default("[]"),
   notes: text("notes"),
   createdBy: text("created_by"),
-  publishedAt: integer("published_at", { mode: "timestamp" }),
+  publishedAt: tsNull("published_at"),
   createdAt: ts("created_at"),
 });
 
-export const bookings = sqliteTable("bookings", {
+export const bookings = pgTable("bookings", {
   id: id(),
   shiftId: text("shift_id").notNull(),
   workerId: text("worker_id").notNull(),
   agencyId: text("agency_id").notNull(),
   status: text("status").notNull().default("REQUESTED"),
   requestedAt: ts("requested_at"),
-  approvedAt: integer("approved_at", { mode: "timestamp" }),
+  approvedAt: tsNull("approved_at"),
   approvedBy: text("approved_by"),
-  cancelledAt: integer("cancelled_at", { mode: "timestamp" }),
+  cancelledAt: tsNull("cancelled_at"),
   cancellationReason: text("cancellation_reason"),
-  checkInTime: integer("check_in_time", { mode: "timestamp" }),
-  checkOutTime: integer("check_out_time", { mode: "timestamp" }),
+  checkInTime: tsNull("check_in_time"),
+  checkOutTime: tsNull("check_out_time"),
   payRateSnapshot: real("pay_rate_snapshot"),
 });
 
-export const timesheets = sqliteTable("timesheets", {
+export const timesheets = pgTable("timesheets", {
   id: id(),
   bookingId: text("booking_id").notNull().unique(),
   workerId: text("worker_id").notNull(),
@@ -191,30 +192,30 @@ export const timesheets = sqliteTable("timesheets", {
   breakMinutes: integer("break_minutes").default(0),
   mileage: real("mileage").default(0),
   notes: text("notes"),
-  status: text("status").notNull().default("DRAFT"), // DRAFT | SUBMITTED | APPROVED | DISPUTED
-  submittedAt: integer("submitted_at", { mode: "timestamp" }),
-  approvedAt: integer("approved_at", { mode: "timestamp" }),
+  status: text("status").notNull().default("DRAFT"),
+  submittedAt: tsNull("submitted_at"),
+  approvedAt: tsNull("approved_at"),
   approvedBy: text("approved_by"),
   disputeReason: text("dispute_reason"),
   totalPay: real("total_pay"),
   createdAt: ts("created_at"),
 });
 
-export const importTemplates = sqliteTable("import_templates", {
+export const importTemplates = pgTable("import_templates", {
   id: id(),
   agencyId: text("agency_id").notNull(),
   clientId: text("client_id"),
   name: text("name").notNull(),
-  fingerprint: text("fingerprint"), // header hash
-  mapping: text("mapping").notNull(), // JSON
-  defaults: text("defaults"), // JSON
+  fingerprint: text("fingerprint"),
+  mapping: text("mapping").notNull(),
+  defaults: text("defaults"),
   useCount: integer("use_count").default(0),
-  lastUsedAt: integer("last_used_at", { mode: "timestamp" }),
+  lastUsedAt: tsNull("last_used_at"),
   createdBy: text("created_by"),
   createdAt: ts("created_at"),
 });
 
-export const importBatches = sqliteTable("import_batches", {
+export const importBatches = pgTable("import_batches", {
   id: id(),
   agencyId: text("agency_id").notNull(),
   coordinatorId: text("coordinator_id").notNull(),
@@ -232,7 +233,7 @@ export const importBatches = sqliteTable("import_batches", {
   createdAt: ts("created_at"),
 });
 
-export const importRows = sqliteTable("import_rows", {
+export const importRows = pgTable("import_rows", {
   id: id(),
   batchId: text("batch_id").notNull(),
   rowNumber: integer("row_number").notNull(),
@@ -244,18 +245,18 @@ export const importRows = sqliteTable("import_rows", {
   action: text("action").default("PENDING"),
 });
 
-export const notifications = sqliteTable("notifications", {
+export const notifications = pgTable("notifications", {
   id: id(),
   userId: text("user_id").notNull(),
   type: text("type").notNull(),
   title: text("title").notNull(),
   body: text("body"),
   href: text("href"),
-  readAt: integer("read_at", { mode: "timestamp" }),
+  readAt: tsNull("read_at"),
   createdAt: ts("created_at"),
 });
 
-export const auditLogs = sqliteTable("audit_logs", {
+export const auditLogs = pgTable("audit_logs", {
   id: id(),
   agencyId: text("agency_id"),
   actorId: text("actor_id"),
@@ -266,10 +267,11 @@ export const auditLogs = sqliteTable("audit_logs", {
   createdAt: ts("created_at"),
 });
 
-export const sessions = sqliteTable("sessions", {
+export const sessions = pgTable("sessions", {
   id: id(),
   userId: text("user_id").notNull(),
-  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  impersonatorId: text("impersonator_id"),
+  expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
   ip: text("ip"),
   userAgent: text("user_agent"),
   createdAt: ts("created_at"),

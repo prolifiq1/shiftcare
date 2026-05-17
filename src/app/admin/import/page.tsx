@@ -24,15 +24,15 @@ async function uploadAction(formData: FormData) {
 
   const headers = Object.keys(rows[0] || {});
   const fp = fingerprint(headers);
-  const tmpl = db
+  const tmpl = (await db
     .select()
     .from(importTemplates)
     .where(and(eq(importTemplates.agencyId, user.agencyId), eq(importTemplates.fingerprint, fp)))
-    .get();
+    .get());
   const mapping = tmpl ? JSON.parse(tmpl.mapping) : autoDetectMapping(rows);
 
   const batchId = randomUUID();
-  db.insert(importBatches)
+  (await db.insert(importBatches)
     .values({
       id: batchId,
       agencyId: user.agencyId,
@@ -45,7 +45,7 @@ async function uploadAction(formData: FormData) {
       status: "REVIEW",
       mappingJson: JSON.stringify(mapping),
     })
-    .run();
+    .run());
 
   let valid = 0, warn = 0, fail = 0;
   for (let i = 0; i < rows.length; i++) {
@@ -54,7 +54,7 @@ async function uploadAction(formData: FormData) {
     if (v.status === "VALID") valid++;
     else if (v.status === "WARNING") warn++;
     else fail++;
-    db.insert(importRows)
+    (await db.insert(importRows)
       .values({
         id: randomUUID(),
         batchId,
@@ -64,36 +64,36 @@ async function uploadAction(formData: FormData) {
         validationStatus: v.status,
         validationMessages: JSON.stringify(v.messages),
       })
-      .run();
+      .run());
   }
-  db.update(importBatches).set({ validRows: valid, warningRows: warn, failedRows: fail }).where(eq(importBatches.id, batchId)).run();
+  (await db.update(importBatches).set({ validRows: valid, warningRows: warn, failedRows: fail }).where(eq(importBatches.id, batchId)).run());
 
   if (tmpl) {
-    db.update(importTemplates)
+    (await db.update(importTemplates)
       .set({ useCount: (tmpl.useCount ?? 0) + 1, lastUsedAt: new Date() })
       .where(eq(importTemplates.id, tmpl.id))
-      .run();
+      .run());
   }
-  audit(user.id, user.agencyId, "import.upload", { type: "importBatch", id: batchId }, { fileName: file.name, rows: rows.length });
+  await audit(user.id, user.agencyId, "import.upload", { type: "importBatch", id: batchId }, { fileName: file.name, rows: rows.length });
   redirect(`/admin/import/${batchId}`);
 }
 
 export default async function ImportPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const user = await requireAdmin();
   const sp = await searchParams;
-  const batches = db
+  const batches = (await db
     .select()
     .from(importBatches)
     .where(eq(importBatches.agencyId, user.agencyId))
     .orderBy(desc(importBatches.createdAt))
-    .all();
-  const templates = db
+    .all());
+  const templates = (await db
     .select()
     .from(importTemplates)
     .where(eq(importTemplates.agencyId, user.agencyId))
     .orderBy(desc(importTemplates.useCount))
-    .all();
-  const cs = db.select().from(clients).where(eq(clients.agencyId, user.agencyId)).all();
+    .all());
+  const cs = (await db.select().from(clients).where(eq(clients.agencyId, user.agencyId)).all());
 
   return (
     <>

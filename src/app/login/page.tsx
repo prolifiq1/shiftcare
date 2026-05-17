@@ -7,6 +7,7 @@ import { Button, Field, Banner } from "@/lib/ui";
 async function routeByRole() {
   const s = await getSession();
   if (!s) redirect("/login");
+  if (s.role === "SUPER_ADMIN") redirect("/platform");
   if (s.role === "WORKER") redirect("/worker");
   redirect("/admin");
 }

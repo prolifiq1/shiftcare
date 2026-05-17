@@ -13,7 +13,7 @@ async function inviteAction(formData: FormData) {
   const firstName = String(formData.get("firstName") || "") || undefined;
   const lastName = String(formData.get("lastName") || "") || undefined;
   if (!email) redirect("/admin/team?error=email");
-  const { token } = createInvite({
+  const { token } = await createInvite({
     agencyId: user.agencyId,
     email,
     role: role as any,
@@ -28,7 +28,7 @@ async function revokeInvite(formData: FormData) {
   "use server";
   await requireAdmin();
   const id = String(formData.get("id"));
-  db.delete(invites).where(eq(invites.id, id)).run();
+  (await db.delete(invites).where(eq(invites.id, id)).run());
   redirect("/admin/team");
 }
 
@@ -43,18 +43,18 @@ const ROLE_LABEL: Record<string, string> = {
 export default async function Team({ searchParams }: { searchParams: Promise<{ invited?: string; token?: string; error?: string }> }) {
   const user = await requireAdmin();
   const sp = await searchParams;
-  const team = db
+  const team = (await db
     .select()
     .from(users)
     .where(and(eq(users.agencyId, user.agencyId)))
-    .all()
+    .all())
     .filter((u) => u.role !== "WORKER");
-  const pending = db
+  const pending = (await db
     .select()
     .from(invites)
     .where(and(eq(invites.agencyId, user.agencyId), isNull(invites.acceptedAt)))
     .orderBy(desc(invites.createdAt))
-    .all()
+    .all())
     .filter((i) => i.expiresAt.getTime() > Date.now());
 
   const inviteUrl = sp.token ? `${process.env.APP_URL || ""}/invite/${sp.token}` : null;

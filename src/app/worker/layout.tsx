@@ -22,13 +22,13 @@ const NAV: { href: string; label: string; icon: string; group: string }[] = [
 
 export default async function WorkerLayout({ children }: { children: React.ReactNode }) {
   const user = await requireWorker();
-  const agency = db.select().from(agencies).where(eq(agencies.id, user.agencyId)).get();
+  const agency = (await db.select().from(agencies).where(eq(agencies.id, user.agencyId)).get());
   const unread =
-    db
+    (await db
       .select({ c: sql<number>`count(*)` })
       .from(notifications)
       .where(and(eq(notifications.userId, user.id), isNull(notifications.readAt)))
-      .get()?.c ?? 0;
+      .get())?.c ?? 0;
 
   const groups = Array.from(new Set(NAV.map((n) => n.group)));
 

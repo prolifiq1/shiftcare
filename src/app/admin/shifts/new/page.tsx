@@ -13,7 +13,7 @@ async function createShift(formData: FormData) {
   const startTime = String(formData.get("startTime"));
   const endTime = String(formData.get("endTime"));
   const locationId = String(formData.get("locationId"));
-  const loc = db.select().from(locations).where(eq(locations.id, locationId)).get();
+  const loc = (await db.select().from(locations).where(eq(locations.id, locationId)).get());
   if (!loc) redirect("/admin/shifts/new?error=1");
 
   const [sh, sm] = startTime.split(":").map(Number);
@@ -29,7 +29,7 @@ async function createShift(formData: FormData) {
   }
 
   const id = randomUUID();
-  db.insert(shifts).values({
+  (await db.insert(shifts).values({
     id, agencyId: user.agencyId, clientId: loc!.clientId, locationId,
     date, endDate, startTime, endTime, overnight,
     durationMinutes: mins,
@@ -43,16 +43,16 @@ async function createShift(formData: FormData) {
     requiredTraining: "[]",
     notes: String(formData.get("notes") || "") || null,
     publishedAt: new Date(), createdBy: user.id,
-  }).run();
-  audit(user.id, user.agencyId, "shift.create", { type: "shift", id });
+  }).run());
+  await audit(user.id, user.agencyId, "shift.create", { type: "shift", id });
   redirect(`/admin/shifts/${id}`);
 }
 
 export default async function NewShift() {
   const user = await requireAdmin();
-  const locs = db.select({ l: locations, c: clients })
+  const locs = (await db.select({ l: locations, c: clients })
     .from(locations).leftJoin(clients, eq(clients.id, locations.clientId))
-    .where(eq(locations.agencyId, user.agencyId)).all();
+    .where(eq(locations.agencyId, user.agencyId)).all());
 
   return (
     <>
