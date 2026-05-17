@@ -12,8 +12,17 @@ async function routeByRole() {
   redirect("/admin");
 }
 
+async function bootstrap() {
+  if (process.env.AUTO_SEED === "0") return;
+  const { ensureSchema, ensureSeeded } = await import("@/lib/db");
+  const { seedDatabase } = await import("@/lib/seed");
+  await ensureSchema();
+  await ensureSeeded(seedDatabase);
+}
+
 async function loginAction(formData: FormData) {
   "use server";
+  await bootstrap();
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "");
   const r = await login(email, password);

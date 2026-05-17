@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import { Pool, Client } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { PgSelectBase, PgInsertBase, PgUpdateBase, PgDeleteBase } from "drizzle-orm/pg-core";
 import * as schema from "./schema";
@@ -185,11 +185,25 @@ export function ensureSchema(): Promise<void> {
 // wipe each other. We serialise with a Postgres advisory lock held on a
 // single dedicated connection, and re-check emptiness inside the lock.
 const SEED_LOCK_KEY = 873214567;
+// Session-level advisory locks don't work through a PgBouncer transaction
+// pool (Neon's pooled endpoint), so the lock + emptiness check run on a
+// dedicated *direct* connection.
+const directUrl =
+  process.env.DATABASE_URL_UNPOOLED ||
+  process.env.POSTGRES_URL_NON_POOLING ||
+  connectionString;
 let seededOnce: Promise<void> | null = null;
 export function ensureSeeded(seedFn: () => Promise<void>): Promise<void> {
   if (!seededOnce) {
     seededOnce = (async () => {
-      const client = await pool.connect();
+      const client = new Client({
+        connectionString: directUrl,
+        ssl:
+          /\bsslmode=require\b/.test(directUrl) || needsSsl
+            ? { rejectUnauthorized: false }
+            : undefined,
+      });
+      await client.connect();
       try {
         await client.query("SELECT pg_advisory_lock($1)", [SEED_LOCK_KEY]);
         const r = await client.query<{ c: number }>(
@@ -199,10 +213,7 @@ export function ensureSeeded(seedFn: () => Promise<void>): Promise<void> {
           await seedFn();
         }
       } finally {
-        await client
-          .query("SELECT pg_advisory_unlock($1)", [SEED_LOCK_KEY])
-          .catch(() => {});
-        client.release();
+        await client.end().catch(() => {});
       }
     })();
   }
