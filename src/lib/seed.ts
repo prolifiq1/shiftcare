@@ -9,8 +9,35 @@ import {
   trainingRecords,
   shifts,
 } from "./schema";
-import { hashPassword } from "./auth";
+import { createClerkClient } from "@clerk/backend";
 import { randomUUID } from "crypto";
+
+const clerk = process.env.CLERK_SECRET_KEY
+  ? createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY })
+  : null;
+
+// Idempotent: returns the Clerk user id for this email, creating it (with a
+// verified email — Backend-created emails are auto-verified) if needed.
+async function ensureClerkUser(
+  email: string, password: string, firstName: string, lastName: string,
+): Promise<string | null> {
+  if (!clerk) return null;
+  const existing = await clerk.users.getUserList({ emailAddress: [email] });
+  if (existing.data.length > 0) {
+    const id = existing.data[0].id;
+    try { await clerk.users.updateUser(id, { password, skipPasswordChecks: true }); } catch {}
+    return id;
+  }
+  const u = await clerk.users.createUser({
+    emailAddress: [email],
+    password,
+    firstName,
+    lastName,
+    skipPasswordChecks: true,
+    skipLegalChecks: true,
+  });
+  return u.id;
+}
 
 export async function seedDatabase() {
   console.log("Seeding...");
@@ -35,11 +62,12 @@ export async function seedDatabase() {
     status: "ACTIVE",
     plan: "INTERNAL",
   });
+  const ownerEmail = "owner@shiftcaredemo.com";
   await db.insert(users).values({
     id: randomUUID(),
     agencyId: platformAgencyId,
-    email: "owner@shiftcare.test",
-    passwordHash: hashPassword("owner123"),
+    email: ownerEmail,
+    clerkId: await ensureClerkUser(ownerEmail, "owner12345", "Platform", "Owner"),
     firstName: "Platform",
     lastName: "Owner",
     role: "SUPER_ADMIN",
@@ -55,11 +83,12 @@ export async function seedDatabase() {
     plan: "PRO",
   });
 
+  const adminEmail = "admin@shiftcaredemo.com";
   const admin = {
     id: randomUUID(),
     agencyId,
-    email: "admin@sure.test",
-    passwordHash: hashPassword("admin123"),
+    email: adminEmail,
+    clerkId: await ensureClerkUser(adminEmail, "admin12345", "Alex", "Coordinator"),
     firstName: "Alex",
     lastName: "Coordinator",
     role: "AGENCY_ADMIN",
@@ -69,9 +98,9 @@ export async function seedDatabase() {
   await db.insert(users).values(admin);
 
   const workerUsers = [
-    { first: "Jamie", last: "Okoro", email: "jamie@sure.test", postcode: "DN33 2AB", lat: 53.547, lng: -0.085 },
-    { first: "Sam", last: "Patel", email: "sam@sure.test", postcode: "DN31 1AA", lat: 53.563, lng: -0.071 },
-    { first: "Riley", last: "Khan", email: "riley@sure.test", postcode: "DN37 9DJ", lat: 53.561, lng: -0.149 },
+    { first: "Jamie", last: "Okoro", email: "jamie@shiftcaredemo.com", postcode: "DN33 2AB", lat: 53.547, lng: -0.085 },
+    { first: "Sam", last: "Patel", email: "sam@shiftcaredemo.com", postcode: "DN31 1AA", lat: 53.563, lng: -0.071 },
+    { first: "Riley", last: "Khan", email: "riley@shiftcaredemo.com", postcode: "DN37 9DJ", lat: 53.561, lng: -0.149 },
   ];
 
   for (const w of workerUsers) {
@@ -80,7 +109,7 @@ export async function seedDatabase() {
       id: uid,
       agencyId,
       email: w.email,
-      passwordHash: hashPassword("worker123"),
+      clerkId: await ensureClerkUser(w.email, "worker12345", w.first, w.last),
       firstName: w.first,
       lastName: w.last,
       role: "WORKER",
@@ -211,8 +240,8 @@ export async function seedDatabase() {
   }
 
   console.log("Seeded.");
-  console.log("Super-admin: owner@shiftcare.test / owner123  →  /platform");
-  console.log("Agency admin: admin@sure.test / admin123");
-  console.log("Workers: jamie@sure.test / worker123 (and sam@/riley@)");
+  console.log("Super-admin: owner@shiftcaredemo.com / owner12345  →  /platform");
+  console.log("Agency admin: admin@shiftcaredemo.com / admin12345");
+  console.log("Workers: jamie@shiftcaredemo.com / worker12345 (and sam@/riley@)");
 }
 

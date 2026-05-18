@@ -1,16 +1,10 @@
 import Link from "next/link";
-import { requireAdmin, logout, stopImpersonation } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import { requireAdmin, stopImpersonation } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { notifications, agencies } from "@/lib/schema";
 import { eq, and, isNull, desc } from "drizzle-orm";
 import { Avatar } from "@/lib/ui";
-
-async function logoutAction() {
-  "use server";
-  await logout();
-  redirect("/login");
-}
+import { SignOutButton } from "@/components/SignOut";
 
 async function stopImpersonationAction() {
   "use server";
@@ -28,7 +22,6 @@ const NAV: { href: string; label: string; icon: string; group?: string }[] = [
   { href: "/admin/team", label: "Team", icon: "◉", group: "PEOPLE" },
   { href: "/admin/notifications", label: "Notifications", icon: "◎", group: "SYSTEM" },
   { href: "/admin/activity", label: "Activity log", icon: "◐", group: "SYSTEM" },
-  { href: "/admin/settings", label: "Settings", icon: "⚙", group: "SYSTEM" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -68,14 +61,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             </div>
           ))}
         </nav>
-        <form action={logoutAction} className="p-3 border-t flex items-center gap-3" style={{ borderColor: "var(--border-subtle)" }}>
+        <div className="p-3 border-t flex items-center gap-3" style={{ borderColor: "var(--border-subtle)" }}>
           <Avatar name={`${user.firstName} ${user.lastName}`} />
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{user.firstName} {user.lastName}</div>
             <div className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{user.role.replace(/_/g, " ")}</div>
           </div>
-          <button className="h-btn h-btn-ghost h-btn-sm" title="Sign out">↗</button>
-        </form>
+          <SignOutButton />
+        </div>
       </aside>
       <main className="flex-1 overflow-auto">
         {user.impersonatorId && (

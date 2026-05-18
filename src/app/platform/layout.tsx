@@ -1,13 +1,7 @@
 import Link from "next/link";
-import { requireSuperAdmin, logout } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import { requireSuperAdmin } from "@/lib/auth";
 import { Avatar } from "@/lib/ui";
-
-async function logoutAction() {
-  "use server";
-  await logout();
-  redirect("/login");
-}
+import { SignOutButton } from "@/components/SignOut";
 
 const NAV = [
   { href: "/platform", label: "Agencies", icon: "▦" },
@@ -39,8 +33,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
             </Link>
           ))}
         </nav>
-        <form
-          action={logoutAction}
+        <div
           className="p-3 border-t flex items-center gap-3"
           style={{ borderColor: "var(--border-subtle)" }}
         >
@@ -49,8 +42,8 @@ export default async function PlatformLayout({ children }: { children: React.Rea
             <div className="text-sm font-medium truncate">{user.firstName} {user.lastName}</div>
             <div className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>Super admin</div>
           </div>
-          <button className="h-btn h-btn-ghost h-btn-sm" title="Sign out">↗</button>
-        </form>
+          <SignOutButton />
+        </div>
       </aside>
       <main className="flex-1 overflow-auto">{children}</main>
     </div>

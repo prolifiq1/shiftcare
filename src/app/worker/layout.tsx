@@ -1,17 +1,11 @@
 import Link from "next/link";
-import { requireWorker, logout } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import { requireWorker } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { notifications, agencies } from "@/lib/schema";
 import { and, eq, isNull } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { Avatar } from "@/lib/ui";
-
-async function logoutAction() {
-  "use server";
-  await logout();
-  redirect("/login");
-}
+import { SignOutButton } from "@/components/SignOut";
 
 const NAV: { href: string; label: string; icon: string; group: string }[] = [
   { href: "/worker", label: "Available shifts", icon: "▤", group: "WORK" },
@@ -65,8 +59,7 @@ export default async function WorkerLayout({ children }: { children: React.React
             </div>
           ))}
         </nav>
-        <form
-          action={logoutAction}
+        <div
           className="p-3 border-t flex items-center gap-3"
           style={{ borderColor: "var(--border-subtle)" }}
         >
@@ -79,8 +72,8 @@ export default async function WorkerLayout({ children }: { children: React.React
               Support worker
             </div>
           </div>
-          <button className="h-btn h-btn-ghost h-btn-sm" title="Sign out">↗</button>
-        </form>
+          <SignOutButton />
+        </div>
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
@@ -93,9 +86,7 @@ export default async function WorkerLayout({ children }: { children: React.React
             <div className="h-7 w-7 rounded-md" style={{ background: "var(--brand-500)" }} />
             <div className="font-semibold tracking-tight text-sm">ShiftCare</div>
           </div>
-          <form action={logoutAction}>
-            <button className="h-link text-xs">Sign out</button>
-          </form>
+          <SignOutButton className="h-link text-xs" label="Sign out" />
         </header>
 
         <main className="flex-1 overflow-auto pb-16 md:pb-0">

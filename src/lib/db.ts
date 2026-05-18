@@ -52,7 +52,7 @@ const DDL = `
 CREATE TABLE IF NOT EXISTS agencies (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT, status TEXT NOT NULL DEFAULT 'ACTIVE', plan TEXT DEFAULT 'TRIAL', created_at TIMESTAMP DEFAULT now());
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY, agency_id TEXT NOT NULL, email TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL, first_name TEXT NOT NULL, last_name TEXT NOT NULL,
+  clerk_id TEXT, password_hash TEXT NOT NULL DEFAULT '', first_name TEXT NOT NULL, last_name TEXT NOT NULL,
   phone TEXT, role TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'ACTIVE',
   email_verified_at TIMESTAMP, mfa_enabled BOOLEAN DEFAULT false, mfa_secret TEXT, mfa_recovery_codes TEXT,
   last_login_at TIMESTAMP, failed_login_count INTEGER DEFAULT 0, locked_until TIMESTAMP,
@@ -161,6 +161,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY, user_id TEXT NOT NULL, impersonator_id TEXT, expires_at TIMESTAMP NOT NULL,
   ip TEXT, user_agent TEXT, created_at TIMESTAMP DEFAULT now()
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_id TEXT;
+ALTER TABLE users ALTER COLUMN password_hash SET DEFAULT '';
 ALTER TABLE agencies ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ACTIVE';
 ALTER TABLE agencies ADD COLUMN IF NOT EXISTS plan TEXT DEFAULT 'TRIAL';
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS impersonator_id TEXT;
