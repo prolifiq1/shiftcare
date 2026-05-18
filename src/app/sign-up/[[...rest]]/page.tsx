@@ -1,11 +1,5 @@
-import { SignUp } from "@clerk/nextjs";
+import { AuthShell } from "@/components/AuthShell";
 
 export default function SignUpPage() {
-  return (
-    <div className="h-auth-shell">
-      <div className="h-auth-card" style={{ display: "flex", justifyContent: "center" }}>
-        <SignUp signInUrl="/login" fallbackRedirectUrl="/post-login" />
-      </div>
-    </div>
-  );
+  return <AuthShell mode="sign-up" />;
 }
