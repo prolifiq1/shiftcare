@@ -11,24 +11,6 @@ const appearance = {
   },
 };
 
-const signInLocalization = {
-  signIn: {
-    start: {
-      title: "Sign in to ShiftCare",
-      subtitle: "Welcome back — sign in to continue.",
-    },
-  },
-};
-
-const signUpLocalization = {
-  signUp: {
-    start: {
-      title: "Create your ShiftCare account",
-      subtitle: "Use the email your agency invited.",
-    },
-  },
-};
-
 function Aside() {
   return (
     <aside
@@ -75,19 +57,9 @@ export function AuthShell({ mode }: { mode: "sign-in" | "sign-up" }) {
     >
       <div className="flex items-center justify-center p-6 sm:p-10">
         {mode === "sign-in" ? (
-          <SignIn
-            appearance={appearance}
-            localization={signInLocalization}
-            signUpUrl="/sign-up"
-            fallbackRedirectUrl="/post-login"
-          />
+          <SignIn appearance={appearance} signUpUrl="/sign-up" fallbackRedirectUrl="/post-login" />
         ) : (
-          <SignUp
-            appearance={appearance}
-            localization={signUpLocalization}
-            signInUrl="/login"
-            fallbackRedirectUrl="/post-login"
-          />
+          <SignUp appearance={appearance} signInUrl="/login" fallbackRedirectUrl="/post-login" />
         )}
       </div>
       <Aside />
