@@ -67,7 +67,7 @@ export async function seedDatabase() {
     id: randomUUID(),
     agencyId: platformAgencyId,
     email: ownerEmail,
-    clerkId: await ensureClerkUser(ownerEmail, "owner12345", "Platform", "Owner"),
+    clerkId: await ensureClerkUser(ownerEmail, "ShiftCareDemo!Owner26", "Platform", "Owner"),
     firstName: "Platform",
     lastName: "Owner",
     role: "SUPER_ADMIN",
@@ -88,7 +88,7 @@ export async function seedDatabase() {
     id: randomUUID(),
     agencyId,
     email: adminEmail,
-    clerkId: await ensureClerkUser(adminEmail, "admin12345", "Alex", "Coordinator"),
+    clerkId: await ensureClerkUser(adminEmail, "ShiftCareDemo!Admin26", "Alex", "Coordinator"),
     firstName: "Alex",
     lastName: "Coordinator",
     role: "AGENCY_ADMIN",
@@ -109,7 +109,7 @@ export async function seedDatabase() {
       id: uid,
       agencyId,
       email: w.email,
-      clerkId: await ensureClerkUser(w.email, "worker12345", w.first, w.last),
+      clerkId: await ensureClerkUser(w.email, "ShiftCareDemo!Worker26", w.first, w.last),
       firstName: w.first,
       lastName: w.last,
       role: "WORKER",
@@ -240,8 +240,8 @@ export async function seedDatabase() {
   }
 
   console.log("Seeded.");
-  console.log("Super-admin: owner@shiftcaredemo.com / owner12345  →  /platform");
-  console.log("Agency admin: admin@shiftcaredemo.com / admin12345");
-  console.log("Workers: jamie@shiftcaredemo.com / worker12345 (and sam@/riley@)");
+  console.log("Super-admin: owner@shiftcaredemo.com / ShiftCareDemo!Owner26  →  /platform");
+  console.log("Agency admin: admin@shiftcaredemo.com / ShiftCareDemo!Admin26");
+  console.log("Workers: jamie@shiftcaredemo.com / ShiftCareDemo!Worker26 (and sam@/riley@)");
 }
 
