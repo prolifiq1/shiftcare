@@ -161,6 +161,16 @@ CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY, user_id TEXT NOT NULL, impersonator_id TEXT, expires_at TIMESTAMP NOT NULL,
   ip TEXT, user_agent TEXT, created_at TIMESTAMP DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS documents (
+  id TEXT PRIMARY KEY, agency_id TEXT NOT NULL, worker_id TEXT NOT NULL,
+  uploaded_by TEXT NOT NULL, booking_id TEXT, kind TEXT NOT NULL, label TEXT,
+  file_name TEXT NOT NULL, mime_type TEXT NOT NULL, size_bytes INTEGER NOT NULL,
+  content_base64 TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING',
+  review_note TEXT, reviewed_at TIMESTAMP, reviewed_by TEXT,
+  created_at TIMESTAMP DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_documents_agency ON documents(agency_id, status);
+CREATE INDEX IF NOT EXISTS idx_documents_worker ON documents(worker_id);
 ALTER TABLE agencies ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ACTIVE';
 ALTER TABLE agencies ADD COLUMN IF NOT EXISTS plan TEXT DEFAULT 'TRIAL';
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS impersonator_id TEXT;

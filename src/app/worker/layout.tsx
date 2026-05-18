@@ -17,7 +17,8 @@ const NAV: { href: string; label: string; icon: string; group: string }[] = [
   { href: "/worker", label: "Available shifts", icon: "▤", group: "WORK" },
   { href: "/worker/schedule", label: "My schedule", icon: "⌘", group: "WORK" },
   { href: "/worker/notifications", label: "Inbox", icon: "◎", group: "WORK" },
-  { href: "/worker/profile", label: "Profile & docs", icon: "◉", group: "ACCOUNT" },
+  { href: "/worker/documents", label: "My documents", icon: "▢", group: "ACCOUNT" },
+  { href: "/worker/profile", label: "Profile", icon: "◉", group: "ACCOUNT" },
 ];
 
 export default async function WorkerLayout({ children }: { children: React.ReactNode }) {

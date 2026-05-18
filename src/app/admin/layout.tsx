@@ -24,6 +24,7 @@ const NAV: { href: string; label: string; icon: string; group?: string }[] = [
   { href: "/admin/bookings", label: "Bookings", icon: "✓", group: "OPERATIONS" },
   { href: "/admin/timesheets", label: "Timesheets", icon: "⏱", group: "OPERATIONS" },
   { href: "/admin/workers", label: "Workers", icon: "◔", group: "PEOPLE" },
+  { href: "/admin/documents", label: "Documents", icon: "▢", group: "PEOPLE" },
   { href: "/admin/clients", label: "Clients", icon: "◈", group: "PEOPLE" },
   { href: "/admin/team", label: "Team", icon: "◉", group: "PEOPLE" },
   { href: "/admin/notifications", label: "Notifications", icon: "◎", group: "SYSTEM" },
