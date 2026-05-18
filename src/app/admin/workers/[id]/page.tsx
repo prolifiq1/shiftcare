@@ -1,10 +1,49 @@
 import { db } from "@/lib/db";
-import { workers, users, workerDocuments, trainingRecords, bookings, shifts, clients, locations } from "@/lib/schema";
+import { workers, users, workerDocuments, trainingRecords, bookings, shifts, clients, locations, documents } from "@/lib/schema";
 import { and, desc, eq } from "drizzle-orm";
-import { requireAdmin } from "@/lib/auth";
-import { PageHeader, Card, Stat, StatusPill, Avatar, Chip, DataTable, EmptyState, Meta } from "@/lib/ui";
-import { notFound } from "next/navigation";
+import { requireAdmin, audit, notify } from "@/lib/auth";
+import { PageHeader, Card, Stat, StatusPill, Avatar, Chip, DataTable, EmptyState, Meta, Select, Field, Button } from "@/lib/ui";
+import { DOC_KINDS, MAX_UPLOAD_BYTES, kindLabel, humanSize } from "@/lib/documents";
+import { notFound, redirect } from "next/navigation";
+import { randomUUID } from "crypto";
 import Link from "next/link";
+
+async function adminUpload(formData: FormData) {
+  "use server";
+  const admin = await requireAdmin();
+  const workerId = String(formData.get("workerId"));
+  const target = await db.select().from(users).where(and(eq(users.id, workerId), eq(users.agencyId, admin.agencyId))).get();
+  if (!target) redirect("/admin/workers");
+  const file = formData.get("file") as File | null;
+  const kind = String(formData.get("kind") || "OTHER");
+  const label = String(formData.get("label") || "") || null;
+  if (!file || file.size === 0) redirect(`/admin/workers/${workerId}?derror=nofile`);
+  if (file!.size > MAX_UPLOAD_BYTES) redirect(`/admin/workers/${workerId}?derror=toobig`);
+  const buf = Buffer.from(await file!.arrayBuffer());
+  await db.insert(documents).values({
+    id: randomUUID(),
+    agencyId: admin.agencyId,
+    workerId,
+    uploadedBy: admin.id,
+    kind,
+    label,
+    fileName: file!.name,
+    mimeType: file!.type || "application/octet-stream",
+    sizeBytes: file!.size,
+    contentBase64: buf.toString("base64"),
+    status: "APPROVED", // uploaded by admin on the worker's behalf, already vetted
+    reviewedAt: new Date(),
+    reviewedBy: admin.id,
+  }).run();
+  await audit(admin.id, admin.agencyId, "document.admin_upload", { type: "document", id: workerId }, { kind });
+  await notify(workerId, {
+    type: "DOCUMENT_ADDED",
+    title: "Document added to your file",
+    body: `The office added ${kindLabel(kind)} to your records.`,
+    href: "/worker/documents",
+  });
+  redirect(`/admin/workers/${workerId}?dok=1`);
+}
 
 function docTone(expiry: Date | null | undefined): { tone: string; label: string } {
   if (!expiry) return { tone: "var(--text-muted)", label: "No expiry" };
@@ -14,14 +53,27 @@ function docTone(expiry: Date | null | undefined): { tone: string; label: string
   return { tone: "var(--status-ok-fg)", label: `${days}d left` };
 }
 
-export default async function WorkerDetail({ params }: { params: Promise<{ id: string }> }) {
+export default async function WorkerDetail({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ dok?: string; derror?: string }>;
+}) {
   const admin = await requireAdmin();
   const { id } = await params;
+  const sp = await searchParams;
 
   const u = await db.select().from(users).where(and(eq(users.id, id), eq(users.agencyId, admin.agencyId))).get();
   const w = await db.select().from(workers).where(eq(workers.id, id)).get();
   if (!u || !w) notFound();
 
+  const uploadedDocs = await db
+    .select()
+    .from(documents)
+    .where(and(eq(documents.workerId, id), eq(documents.agencyId, admin.agencyId)))
+    .orderBy(desc(documents.createdAt))
+    .all();
   const docs = await db.select().from(workerDocuments).where(eq(workerDocuments.workerId, id)).all();
   const trainings = await db.select().from(trainingRecords).where(eq(trainingRecords.workerId, id)).all();
   const history = await db
@@ -141,6 +193,65 @@ export default async function WorkerDetail({ params }: { params: Promise<{ id: s
                   </tbody>
                 </DataTable>
               )}
+            </Card>
+
+            <Card
+              title={`Uploaded files (${uploadedDocs.length})`}
+              subtitle="DBS, right to work, ID, training, signed timesheets"
+              padded={false}
+            >
+              {sp.dok && (
+                <div className="px-5 pt-4 text-xs" style={{ color: "var(--status-ok-fg)" }}>
+                  Document added to this worker’s file.
+                </div>
+              )}
+              {sp.derror === "toobig" && (
+                <div className="px-5 pt-4 text-xs" style={{ color: "var(--status-danger-fg)" }}>
+                  File too large (max {humanSize(MAX_UPLOAD_BYTES)}).
+                </div>
+              )}
+              {sp.derror === "nofile" && (
+                <div className="px-5 pt-4 text-xs" style={{ color: "var(--status-danger-fg)" }}>
+                  Pick a file to upload.
+                </div>
+              )}
+              {uploadedDocs.length === 0 ? (
+                <div className="p-5 text-sm" style={{ color: "var(--text-muted)" }}>No uploaded files yet.</div>
+              ) : (
+                <table className="h-table">
+                  <thead><tr><th>Type</th><th>File</th><th>Size</th><th>Status</th><th></th></tr></thead>
+                  <tbody>
+                    {uploadedDocs.map((d) => (
+                      <tr key={d.id}>
+                        <td className="font-medium">{kindLabel(d.kind)}{d.label ? <span className="text-xs" style={{ color: "var(--text-muted)" }}> · {d.label}</span> : null}</td>
+                        <td className="text-xs">{d.fileName}</td>
+                        <td className="h-num text-xs">{humanSize(d.sizeBytes)}</td>
+                        <td><StatusPill status={d.status} /></td>
+                        <td className="text-right">
+                          <a className="h-link text-xs" href={`/api/documents/${d.id}`} target="_blank" rel="noreferrer">View →</a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              <div className="p-5 border-t" style={{ borderColor: "var(--border-subtle)" }}>
+                <div className="h-section-title mb-3">Upload on behalf of this worker</div>
+                <form action={adminUpload} encType="multipart/form-data" className="space-y-3">
+                  <input type="hidden" name="workerId" value={w.id} />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <Select label="Document type" name="kind" defaultValue="DBS_ENHANCED">
+                      {DOC_KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+                    </Select>
+                    <Field label="Label (optional)" name="label" />
+                  </div>
+                  <div>
+                    <label className="h-label">File</label>
+                    <input type="file" name="file" required accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.doc,.docx" className="block w-full text-sm" />
+                  </div>
+                  <Button type="submit" variant="secondary">Add to file</Button>
+                </form>
+              </div>
             </Card>
 
             <Card title={`Booking history (${history.length})`} padded={false}>

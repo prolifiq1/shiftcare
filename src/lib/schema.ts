@@ -277,3 +277,24 @@ export const sessions = pgTable("sessions", {
   userAgent: text("user_agent"),
   createdAt: ts("created_at"),
 });
+
+// Uploaded files (compliance docs, training certs, signed timesheets).
+// Stored inline as base64 for demo simplicity (no external blob store).
+export const documents = pgTable("documents", {
+  id: id(),
+  agencyId: text("agency_id").notNull(),
+  workerId: text("worker_id").notNull(),
+  uploadedBy: text("uploaded_by").notNull(),
+  bookingId: text("booking_id"),
+  kind: text("kind").notNull(), // DBS_ENHANCED | RIGHT_TO_WORK | TRAINING | TIMESHEET | OTHER
+  label: text("label"),
+  fileName: text("file_name").notNull(),
+  mimeType: text("mime_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  contentBase64: text("content_base64").notNull(),
+  status: text("status").notNull().default("PENDING"), // PENDING | APPROVED | REJECTED
+  reviewNote: text("review_note"),
+  reviewedAt: tsNull("reviewed_at"),
+  reviewedBy: text("reviewed_by"),
+  createdAt: ts("created_at"),
+});

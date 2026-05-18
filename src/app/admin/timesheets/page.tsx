@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { timesheets, bookings, shifts, users, clients } from "@/lib/schema";
+import { timesheets, bookings, shifts, users, clients, documents } from "@/lib/schema";
 import { and, desc, eq } from "drizzle-orm";
 import { requireAdmin, audit, notify } from "@/lib/auth";
 import { PageHeader, Tabs, DataTable, EmptyState, Avatar, StatusPill, Button, Money } from "@/lib/ui";
@@ -57,6 +57,13 @@ export default async function Timesheets({ searchParams }: { searchParams: Promi
     .orderBy(desc(timesheets.submittedAt))
     .all());
 
+  const tsDocs = (await db
+    .select()
+    .from(documents)
+    .where(and(eq(documents.agencyId, user.agencyId), eq(documents.kind, "TIMESHEET")))
+    .all());
+  const docByBooking = new Map(tsDocs.map((d) => [d.bookingId ?? "", d.id]));
+
   const filter = (statuses: string[]) => base.filter((r) => statuses.includes(r.t.status));
   const tabs = [
     { key: "submitted", label: "To approve", href: "/admin/timesheets?tab=submitted", count: filter(["SUBMITTED"]).length },
@@ -112,7 +119,19 @@ export default async function Timesheets({ searchParams }: { searchParams: Promi
                   <td>{c?.name}</td>
                   <td className="h-num font-medium">{(t.workedMinutes / 60).toFixed(2)}</td>
                   <td className="h-num"><Money amount={t.totalPay} /></td>
-                  <td><StatusPill status={t.status} /></td>
+                  <td>
+                    <StatusPill status={t.status} />
+                    {docByBooking.get(t.bookingId) && (
+                      <a
+                        className="h-link text-xs block mt-1"
+                        href={`/api/documents/${docByBooking.get(t.bookingId)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        View signed sheet →
+                      </a>
+                    )}
+                  </td>
                   <td className="text-right">
                     {t.status === "SUBMITTED" && (
                       <div className="inline-flex gap-2">
