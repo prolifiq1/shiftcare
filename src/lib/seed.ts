@@ -62,7 +62,7 @@ export async function seedDatabase() {
     status: "ACTIVE",
     plan: "INTERNAL",
   });
-  const ownerEmail = "owner@shiftcaredemo.com";
+  const ownerEmail = "owner+clerk_test@shiftcaredemo.com";
   await db.insert(users).values({
     id: randomUUID(),
     agencyId: platformAgencyId,
@@ -83,7 +83,7 @@ export async function seedDatabase() {
     plan: "PRO",
   });
 
-  const adminEmail = "admin@shiftcaredemo.com";
+  const adminEmail = "admin+clerk_test@shiftcaredemo.com";
   const admin = {
     id: randomUUID(),
     agencyId,
@@ -98,9 +98,9 @@ export async function seedDatabase() {
   await db.insert(users).values(admin);
 
   const workerUsers = [
-    { first: "Jamie", last: "Okoro", email: "jamie@shiftcaredemo.com", postcode: "DN33 2AB", lat: 53.547, lng: -0.085 },
-    { first: "Sam", last: "Patel", email: "sam@shiftcaredemo.com", postcode: "DN31 1AA", lat: 53.563, lng: -0.071 },
-    { first: "Riley", last: "Khan", email: "riley@shiftcaredemo.com", postcode: "DN37 9DJ", lat: 53.561, lng: -0.149 },
+    { first: "Jamie", last: "Okoro", email: "jamie+clerk_test@shiftcaredemo.com", postcode: "DN33 2AB", lat: 53.547, lng: -0.085 },
+    { first: "Sam", last: "Patel", email: "sam+clerk_test@shiftcaredemo.com", postcode: "DN31 1AA", lat: 53.563, lng: -0.071 },
+    { first: "Riley", last: "Khan", email: "riley+clerk_test@shiftcaredemo.com", postcode: "DN37 9DJ", lat: 53.561, lng: -0.149 },
   ];
 
   for (const w of workerUsers) {
@@ -240,8 +240,8 @@ export async function seedDatabase() {
   }
 
   console.log("Seeded.");
-  console.log("Super-admin: owner@shiftcaredemo.com / ShiftCareDemo!Owner26  →  /platform");
-  console.log("Agency admin: admin@shiftcaredemo.com / ShiftCareDemo!Admin26");
-  console.log("Workers: jamie@shiftcaredemo.com / ShiftCareDemo!Worker26 (and sam@/riley@)");
+  console.log("Super-admin: owner+clerk_test@shiftcaredemo.com / ShiftCareDemo!Owner26  →  /platform");
+  console.log("Agency admin: admin+clerk_test@shiftcaredemo.com / ShiftCareDemo!Admin26");
+  console.log("Workers: jamie+clerk_test@shiftcaredemo.com / ShiftCareDemo!Worker26 (and sam@/riley@)");
 }
 
