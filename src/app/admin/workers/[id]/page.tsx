@@ -154,6 +154,9 @@ export default async function WorkerDetail({
                   {u.status}
                 </strong>
               </div>
+              <Link href={`/admin/messages?w=${w.id}`} className="h-btn h-btn-secondary w-full mb-3">
+                Message worker
+              </Link>
               <div className="space-y-2">
                 <form action={setActive}>
                   <input type="hidden" name="workerId" value={w.id} />

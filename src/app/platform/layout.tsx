@@ -44,7 +44,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
           className="p-3 border-t flex items-center gap-3"
           style={{ borderColor: "var(--border-subtle)" }}
         >
-          <Avatar name={`${user.firstName} ${user.lastName}`} />
+          <Avatar name={`${user.firstName} ${user.lastName}`} src={user.avatarDocId ? `/api/documents/${user.avatarDocId}` : null} />
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium truncate">{user.firstName} {user.lastName}</div>
             <div className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>Super admin</div>

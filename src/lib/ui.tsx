@@ -221,8 +221,17 @@ export function EmptyState({
   );
 }
 
-export function Avatar({ name, className = "" }: { name: string; className?: string }) {
+export function Avatar({ name, className = "", src }: { name: string; className?: string; src?: string | null }) {
   const initials = name.split(" ").map(s => s[0]).slice(0, 2).join("").toUpperCase();
+  if (src) {
+    return (
+      <span
+        className={`h-avatar ${className}`}
+        style={{ padding: 0, overflow: "hidden", backgroundImage: `url("${src}")`, backgroundSize: "cover", backgroundPosition: "center" }}
+        aria-label={name}
+      />
+    );
+  }
   return <span className={`h-avatar ${className}`}>{initials}</span>;
 }
 

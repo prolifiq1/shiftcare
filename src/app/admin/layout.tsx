@@ -25,6 +25,7 @@ const NAV: { href: string; label: string; icon: string; group?: string }[] = [
   { href: "/admin/timesheets", label: "Timesheets", icon: "⏱", group: "OPERATIONS" },
   { href: "/admin/workers", label: "Workers", icon: "◔", group: "PEOPLE" },
   { href: "/admin/documents", label: "Documents", icon: "▢", group: "PEOPLE" },
+  { href: "/admin/messages", label: "Messages", icon: "✉", group: "PEOPLE" },
   { href: "/admin/clients", label: "Clients", icon: "◈", group: "PEOPLE" },
   { href: "/admin/team", label: "Team", icon: "◉", group: "PEOPLE" },
   { href: "/admin/notifications", label: "Notifications", icon: "◎", group: "SYSTEM" },
@@ -70,7 +71,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           ))}
         </nav>
         <form action={logoutAction} className="p-3 border-t flex items-center gap-3" style={{ borderColor: "var(--border-subtle)" }}>
-          <Avatar name={`${user.firstName} ${user.lastName}`} />
+          <Avatar name={`${user.firstName} ${user.lastName}`} src={user.avatarDocId ? `/api/documents/${user.avatarDocId}` : null} />
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{user.firstName} {user.lastName}</div>
             <div className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{user.role.replace(/_/g, " ")}</div>

@@ -19,6 +19,7 @@ export type SessionUser = {
   id: string; agencyId: string; email: string;
   firstName: string; lastName: string; role: Role;
   emailVerified: boolean; mfaEnabled: boolean;
+  avatarDocId?: string | null;
   impersonatorId?: string | null;
 };
 
@@ -159,6 +160,7 @@ export async function getSession(): Promise<SessionUser | null> {
     id: user.id, agencyId: user.agencyId, email: user.email,
     firstName: user.firstName, lastName: user.lastName, role: user.role as Role,
     emailVerified: !!user.emailVerifiedAt, mfaEnabled: !!user.mfaEnabled,
+    avatarDocId: user.avatarDocId ?? null,
     impersonatorId: session.impersonatorId ?? null,
   };
 }
