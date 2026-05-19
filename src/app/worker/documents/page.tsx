@@ -5,19 +5,27 @@ import { requireWorker, audit, notify } from "@/lib/auth";
 import { users } from "@/lib/schema";
 import { PageHeader, Card, StatusPill, EmptyState, Select, Field, Button, Banner } from "@/lib/ui";
 import { DOC_KINDS, MAX_UPLOAD_BYTES, kindLabel, humanSize } from "@/lib/documents";
+import { validateUpload } from "@/lib/upload";
+import { rateLimit } from "@/lib/ratelimit";
 import { redirect } from "next/navigation";
 import { randomUUID } from "crypto";
+
+const KIND_VALUES = DOC_KINDS.map((k) => k.value) as string[];
 
 async function uploadDoc(formData: FormData) {
   "use server";
   const user = await requireWorker();
+  if (!rateLimit(`upload:${user.id}`, 20, 5 * 60_000)) {
+    redirect("/worker/documents?error=rate");
+  }
   const file = formData.get("file") as File | null;
-  const kind = String(formData.get("kind") || "OTHER");
-  const label = String(formData.get("label") || "") || null;
-  if (!file || file.size === 0) redirect("/worker/documents?error=nofile");
-  if (file!.size > MAX_UPLOAD_BYTES) redirect("/worker/documents?error=toobig");
+  const rawKind = String(formData.get("kind") || "OTHER");
+  const kind = KIND_VALUES.includes(rawKind) ? rawKind : "OTHER";
+  const label = (String(formData.get("label") || "").trim().slice(0, 120)) || null;
 
-  const buf = Buffer.from(await file!.arrayBuffer());
+  const v = await validateUpload(file);
+  if (!v.ok) redirect(`/worker/documents?error=${v.error}`);
+
   await db.insert(documents).values({
     id: randomUUID(),
     agencyId: user.agencyId,
@@ -25,10 +33,10 @@ async function uploadDoc(formData: FormData) {
     uploadedBy: user.id,
     kind,
     label,
-    fileName: file!.name,
-    mimeType: file!.type || "application/octet-stream",
-    sizeBytes: file!.size,
-    contentBase64: buf.toString("base64"),
+    fileName: v.fileName,
+    mimeType: v.mime,
+    sizeBytes: v.size,
+    contentBase64: v.buf.toString("base64"),
     status: "PENDING",
   }).run();
   await audit(user.id, user.agencyId, "document.upload", { type: "document", id: user.id }, { kind });
@@ -70,6 +78,8 @@ export default async function WorkerDocuments({ searchParams }: { searchParams: 
         {sp.ok && <Banner tone="ok" title="Uploaded">Your document was sent to the office for review.</Banner>}
         {sp.error === "nofile" && <Banner tone="danger" title="No file selected">Pick a file to upload.</Banner>}
         {sp.error === "toobig" && <Banner tone="danger" title="File too large">Maximum size is {humanSize(MAX_UPLOAD_BYTES)}.</Banner>}
+        {sp.error === "type" && <Banner tone="danger" title="Unsupported file">Only PDF or image files (PDF, JPG, PNG, WEBP, HEIC) are allowed.</Banner>}
+        {sp.error === "rate" && <Banner tone="danger" title="Too many uploads">Please wait a few minutes and try again.</Banner>}
 
         <Card title="Upload a document" subtitle="DBS, right to work, ID, training certificates, etc.">
           <form action={uploadDoc} encType="multipart/form-data" className="space-y-4">

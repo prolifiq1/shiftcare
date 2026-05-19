@@ -4,6 +4,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { requireWorker, notify, audit } from "@/lib/auth";
 import { Card, Field, Textarea, Button, Banner } from "@/lib/ui";
 import { MAX_UPLOAD_BYTES, humanSize } from "@/lib/documents";
+import { validateUpload } from "@/lib/upload";
 import { notFound, redirect } from "next/navigation";
 import { randomUUID } from "crypto";
 import Link from "next/link";
@@ -53,24 +54,26 @@ async function submitTimesheet(formData: FormData) {
   (await db.update(bookings).set({ status: "TIMESHEET_SUBMITTED" }).where(eq(bookings.id, bookingId)).run());
   await audit(user.id, user.agencyId, "timesheet.submit", { type: "booking", id: bookingId });
 
-  // Optional signed-timesheet file attachment.
+  // Optional signed-timesheet file attachment (validated; bad files skipped).
   const file = formData.get("file") as File | null;
-  if (file && file.size > 0 && file.size <= MAX_UPLOAD_BYTES) {
-    const buf = Buffer.from(await file.arrayBuffer());
-    await db.insert(documents).values({
-      id: randomUUID(),
-      agencyId: user.agencyId,
-      workerId: user.id,
-      uploadedBy: user.id,
-      bookingId,
-      kind: "TIMESHEET",
-      label: `Timesheet ${s!.date}`,
-      fileName: file.name,
-      mimeType: file.type || "application/octet-stream",
-      sizeBytes: file.size,
-      contentBase64: buf.toString("base64"),
-      status: "PENDING",
-    }).run();
+  if (file && file.size > 0) {
+    const v = await validateUpload(file);
+    if (v.ok) {
+      await db.insert(documents).values({
+        id: randomUUID(),
+        agencyId: user.agencyId,
+        workerId: user.id,
+        uploadedBy: user.id,
+        bookingId,
+        kind: "TIMESHEET",
+        label: `Timesheet ${s!.date}`,
+        fileName: v.fileName,
+        mimeType: v.mime,
+        sizeBytes: v.size,
+        contentBase64: v.buf.toString("base64"),
+        status: "PENDING",
+      }).run();
+    }
   }
 
   // Notify any admin in the agency? We notify a generic admin via createdBy of the shift (best effort).
