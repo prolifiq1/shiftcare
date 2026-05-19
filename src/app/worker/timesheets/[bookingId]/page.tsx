@@ -3,8 +3,7 @@ import { bookings, shifts, timesheets, clients, documents } from "@/lib/schema";
 import { and, desc, eq } from "drizzle-orm";
 import { requireWorker, notify, audit } from "@/lib/auth";
 import { Card, Field, Textarea, Button, Banner } from "@/lib/ui";
-import { MAX_UPLOAD_BYTES, humanSize } from "@/lib/documents";
-import { validateUpload } from "@/lib/upload";
+import { Uploader, DeleteDoc } from "@/components/Uploader";
 import { notFound, redirect } from "next/navigation";
 import { randomUUID } from "crypto";
 import Link from "next/link";
@@ -53,28 +52,6 @@ async function submitTimesheet(formData: FormData) {
 
   (await db.update(bookings).set({ status: "TIMESHEET_SUBMITTED" }).where(eq(bookings.id, bookingId)).run());
   await audit(user.id, user.agencyId, "timesheet.submit", { type: "booking", id: bookingId });
-
-  // Optional signed-timesheet file attachment (validated; bad files skipped).
-  const file = formData.get("file") as File | null;
-  if (file && file.size > 0) {
-    const v = await validateUpload(file);
-    if (v.ok) {
-      await db.insert(documents).values({
-        id: randomUUID(),
-        agencyId: user.agencyId,
-        workerId: user.id,
-        uploadedBy: user.id,
-        bookingId,
-        kind: "TIMESHEET",
-        label: `Timesheet ${s!.date}`,
-        fileName: v.fileName,
-        mimeType: v.mime,
-        sizeBytes: v.size,
-        contentBase64: v.buf.toString("base64"),
-        status: "PENDING",
-      }).run();
-    }
-  }
 
   // Notify any admin in the agency? We notify a generic admin via createdBy of the shift (best effort).
   if (s!.createdBy) {
@@ -128,7 +105,7 @@ export default async function SubmitTimesheet({ params }: { params: Promise<{ bo
       )}
 
       <Card>
-        <form action={submitTimesheet} encType="multipart/form-data" className="space-y-4">
+        <form action={submitTimesheet} className="space-y-4">
           <input type="hidden" name="bookingId" value={bookingId} />
           <div className="grid grid-cols-2 gap-3">
             <Field
@@ -143,21 +120,24 @@ export default async function SubmitTimesheet({ params }: { params: Promise<{ bo
           </div>
           <Field label="Mileage" type="number" step="0.1" name="mileage" defaultValue={existing?.mileage ?? 0} />
           <Textarea label="Notes (optional)" name="notes" rows={3} defaultValue={existing?.notes ?? ""} />
-          <div>
-            <label className="h-label">Signed timesheet (optional)</label>
-            <input type="file" name="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.heic" className="block w-full text-sm" />
-            <div className="h-help">
-              Photo or PDF of the signed sheet, up to {humanSize(MAX_UPLOAD_BYTES)}.
-              {attachment && (
-                <> · <a className="h-link" href={`/api/documents/${attachment.id}`} target="_blank" rel="noreferrer">View current</a></>
-              )}
-            </div>
-          </div>
           <div className="flex gap-2 pt-1">
             <Button type="submit">Submit timesheet</Button>
             <Link href="/worker/schedule" className="h-btn h-btn-ghost">Cancel</Link>
           </div>
         </form>
+      </Card>
+
+      <Card title="Signed timesheet (optional)" subtitle="Upload a photo or PDF of the signed sheet.">
+        {attachment ? (
+          <div className="flex items-center justify-between text-sm">
+            <a className="h-link" href={`/api/documents/${attachment.id}`} target="_blank" rel="noreferrer">
+              {attachment.fileName}
+            </a>
+            <DeleteDoc id={attachment.id} label="Remove" />
+          </div>
+        ) : (
+          <Uploader bookingId={bookingId} fixedKind="TIMESHEET" />
+        )}
       </Card>
     </div>
   );

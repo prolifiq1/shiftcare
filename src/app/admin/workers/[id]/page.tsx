@@ -2,51 +2,11 @@ import { db } from "@/lib/db";
 import { workers, users, workerDocuments, trainingRecords, bookings, shifts, clients, locations, documents, timesheets } from "@/lib/schema";
 import { and, desc, eq } from "drizzle-orm";
 import { requireAdmin, audit, notify } from "@/lib/auth";
-import { PageHeader, Card, Stat, StatusPill, Avatar, Chip, DataTable, EmptyState, Meta, Select, Field, Button } from "@/lib/ui";
-import { DOC_KINDS, MAX_UPLOAD_BYTES, kindLabel, humanSize } from "@/lib/documents";
-import { validateUpload } from "@/lib/upload";
-import { rateLimit } from "@/lib/ratelimit";
+import { PageHeader, Card, Stat, StatusPill, Avatar, Chip, DataTable, EmptyState, Meta, Button } from "@/lib/ui";
+import { kindLabel, humanSize } from "@/lib/documents";
+import { Uploader, DeleteDoc } from "@/components/Uploader";
 import { notFound, redirect } from "next/navigation";
-import { randomUUID } from "crypto";
 import Link from "next/link";
-
-async function adminUpload(formData: FormData) {
-  "use server";
-  const admin = await requireAdmin();
-  const workerId = String(formData.get("workerId"));
-  const target = await db.select().from(users).where(and(eq(users.id, workerId), eq(users.agencyId, admin.agencyId))).get();
-  if (!target) redirect("/admin/workers");
-  if (!rateLimit(`upload:${admin.id}`, 40, 5 * 60_000)) redirect(`/admin/workers/${workerId}?derror=rate`);
-  const file = formData.get("file") as File | null;
-  const rawKind = String(formData.get("kind") || "OTHER");
-  const kind = DOC_KINDS.map((k) => k.value as string).includes(rawKind) ? rawKind : "OTHER";
-  const label = (String(formData.get("label") || "").trim().slice(0, 120)) || null;
-  const v = await validateUpload(file);
-  if (!v.ok) redirect(`/admin/workers/${workerId}?derror=${v.error}`);
-  await db.insert(documents).values({
-    id: randomUUID(),
-    agencyId: admin.agencyId,
-    workerId,
-    uploadedBy: admin.id,
-    kind,
-    label,
-    fileName: v.fileName,
-    mimeType: v.mime,
-    sizeBytes: v.size,
-    contentBase64: v.buf.toString("base64"),
-    status: "APPROVED", // uploaded by admin on the worker's behalf, already vetted
-    reviewedAt: new Date(),
-    reviewedBy: admin.id,
-  }).run();
-  await audit(admin.id, admin.agencyId, "document.admin_upload", { type: "document", id: workerId }, { kind });
-  await notify(workerId, {
-    type: "DOCUMENT_ADDED",
-    title: "Document added to your file",
-    body: `The office added ${kindLabel(kind)} to your records.`,
-    href: "/worker/documents",
-  });
-  redirect(`/admin/workers/${workerId}?dok=1`);
-}
 
 async function setActive(formData: FormData) {
   "use server";
@@ -282,31 +242,6 @@ export default async function WorkerDetail({
               subtitle="DBS, right to work, ID, training, signed timesheets"
               padded={false}
             >
-              {sp.dok && (
-                <div className="px-5 pt-4 text-xs" style={{ color: "var(--status-ok-fg)" }}>
-                  Document added to this worker’s file.
-                </div>
-              )}
-              {sp.derror === "toobig" && (
-                <div className="px-5 pt-4 text-xs" style={{ color: "var(--status-danger-fg)" }}>
-                  File too large (max {humanSize(MAX_UPLOAD_BYTES)}).
-                </div>
-              )}
-              {sp.derror === "nofile" && (
-                <div className="px-5 pt-4 text-xs" style={{ color: "var(--status-danger-fg)" }}>
-                  Pick a file to upload.
-                </div>
-              )}
-              {sp.derror === "type" && (
-                <div className="px-5 pt-4 text-xs" style={{ color: "var(--status-danger-fg)" }}>
-                  Unsupported file — PDF or image only.
-                </div>
-              )}
-              {sp.derror === "rate" && (
-                <div className="px-5 pt-4 text-xs" style={{ color: "var(--status-danger-fg)" }}>
-                  Too many uploads — wait a few minutes.
-                </div>
-              )}
               {uploadedDocs.length === 0 ? (
                 <div className="p-5 text-sm" style={{ color: "var(--text-muted)" }}>No uploaded files yet.</div>
               ) : (
@@ -320,7 +255,10 @@ export default async function WorkerDetail({
                         <td className="h-num text-xs">{humanSize(d.sizeBytes)}</td>
                         <td><StatusPill status={d.status} /></td>
                         <td className="text-right">
-                          <a className="h-link text-xs" href={`/api/documents/${d.id}`} target="_blank" rel="noreferrer">View →</a>
+                          <span className="inline-flex items-center gap-3">
+                            <a className="h-link text-xs" href={`/api/documents/${d.id}`} target="_blank" rel="noreferrer">View →</a>
+                            <DeleteDoc id={d.id} />
+                          </span>
                         </td>
                       </tr>
                     ))}
@@ -329,20 +267,7 @@ export default async function WorkerDetail({
               )}
               <div className="p-5 border-t" style={{ borderColor: "var(--border-subtle)" }}>
                 <div className="h-section-title mb-3">Upload on behalf of this worker</div>
-                <form action={adminUpload} encType="multipart/form-data" className="space-y-3">
-                  <input type="hidden" name="workerId" value={w.id} />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <Select label="Document type" name="kind" defaultValue="DBS_ENHANCED">
-                      {DOC_KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
-                    </Select>
-                    <Field label="Label (optional)" name="label" />
-                  </div>
-                  <div>
-                    <label className="h-label">File</label>
-                    <input type="file" name="file" required accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.doc,.docx" className="block w-full text-sm" />
-                  </div>
-                  <Button type="submit" variant="secondary">Add to file</Button>
-                </form>
+                <Uploader workerId={w.id} withMeta />
               </div>
             </Card>
 

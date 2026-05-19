@@ -4,6 +4,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { requireAdmin, audit, notify } from "@/lib/auth";
 import { PageHeader, Tabs, Card, DataTable, EmptyState, StatusPill, Avatar, Button } from "@/lib/ui";
 import { kindLabel, humanSize } from "@/lib/documents";
+import { DeleteDoc } from "@/components/Uploader";
 import { redirect } from "next/navigation";
 
 async function review(formData: FormData) {
@@ -94,23 +95,26 @@ export default async function AdminDocuments({ searchParams }: { searchParams: P
                       )}
                     </td>
                     <td className="text-right">
-                      {d.status === "PENDING" ? (
-                        <div className="inline-flex gap-2">
-                          <form action={review}>
-                            <input type="hidden" name="id" value={d.id} />
-                            <input type="hidden" name="decision" value="approve" />
-                            <Button size="sm" type="submit">Approve</Button>
-                          </form>
-                          <form action={review}>
-                            <input type="hidden" name="id" value={d.id} />
-                            <input type="hidden" name="decision" value="reject" />
-                            <input type="hidden" name="note" value="Please re-upload a clearer / valid copy." />
-                            <Button size="sm" variant="ghost" type="submit">Reject</Button>
-                          </form>
-                        </div>
-                      ) : (
-                        <a className="h-link text-xs" href={`/api/documents/${d.id}`} target="_blank" rel="noreferrer">View →</a>
-                      )}
+                      <span className="inline-flex items-center gap-2">
+                        {d.status === "PENDING" ? (
+                          <>
+                            <form action={review}>
+                              <input type="hidden" name="id" value={d.id} />
+                              <input type="hidden" name="decision" value="approve" />
+                              <Button size="sm" type="submit">Approve</Button>
+                            </form>
+                            <form action={review}>
+                              <input type="hidden" name="id" value={d.id} />
+                              <input type="hidden" name="decision" value="reject" />
+                              <input type="hidden" name="note" value="Please re-upload a clearer / valid copy." />
+                              <Button size="sm" variant="ghost" type="submit">Reject</Button>
+                            </form>
+                          </>
+                        ) : (
+                          <a className="h-link text-xs" href={`/api/documents/${d.id}`} target="_blank" rel="noreferrer">View →</a>
+                        )}
+                        <DeleteDoc id={d.id} />
+                      </span>
                     </td>
                   </tr>
                 ))}
