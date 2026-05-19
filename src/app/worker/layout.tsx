@@ -11,6 +11,7 @@ const NAV: { href: string; label: string; icon: string; group: string }[] = [
   { href: "/worker", label: "Available shifts", icon: "▤", group: "WORK" },
   { href: "/worker/schedule", label: "My schedule", icon: "⌘", group: "WORK" },
   { href: "/worker/notifications", label: "Inbox", icon: "◎", group: "WORK" },
+  { href: "/worker/messages", label: "Messages", icon: "✉", group: "WORK" },
   { href: "/worker/documents", label: "My documents", icon: "▢", group: "ACCOUNT" },
   { href: "/worker/profile", label: "Profile", icon: "◉", group: "ACCOUNT" },
 ];
@@ -64,7 +65,7 @@ export default async function WorkerLayout({ children }: { children: React.React
           className="p-3 border-t flex items-center gap-3"
           style={{ borderColor: "var(--border-subtle)" }}
         >
-          <Avatar name={`${user.firstName} ${user.lastName}`} />
+          <Avatar name={`${user.firstName} ${user.lastName}`} src={user.avatarDocId ? `/api/documents/${user.avatarDocId}` : null} />
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>
               {user.firstName} {user.lastName}

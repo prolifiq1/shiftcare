@@ -171,6 +171,13 @@ CREATE TABLE IF NOT EXISTS documents (
 );
 CREATE INDEX IF NOT EXISTS idx_documents_agency ON documents(agency_id, status);
 CREATE INDEX IF NOT EXISTS idx_documents_worker ON documents(worker_id);
+CREATE TABLE IF NOT EXISTS messages (
+  id TEXT PRIMARY KEY, agency_id TEXT NOT NULL, worker_id TEXT NOT NULL,
+  sender_id TEXT NOT NULL, sender_role TEXT NOT NULL, body TEXT NOT NULL,
+  read_at TIMESTAMP, created_at TIMESTAMP DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(agency_id, worker_id, created_at);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_doc_id TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_id TEXT;
 ALTER TABLE users ALTER COLUMN password_hash SET DEFAULT '';
 ALTER TABLE agencies ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ACTIVE';

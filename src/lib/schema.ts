@@ -22,6 +22,7 @@ export const users = pgTable("users", {
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   phone: text("phone"),
+  avatarDocId: text("avatar_doc_id"),
   role: text("role").notNull(),
   status: text("status").notNull().default("ACTIVE"),
   emailVerifiedAt: tsNull("email_verified_at"),
@@ -296,5 +297,18 @@ export const documents = pgTable("documents", {
   reviewNote: text("review_note"),
   reviewedAt: tsNull("reviewed_at"),
   reviewedBy: text("reviewed_by"),
+  createdAt: ts("created_at"),
+});
+
+// In-app conversation between a worker and the agency office. One thread
+// per worker per agency (rows sharing workerId form the thread).
+export const messages = pgTable("messages", {
+  id: id(),
+  agencyId: text("agency_id").notNull(),
+  workerId: text("worker_id").notNull(),
+  senderId: text("sender_id").notNull(),
+  senderRole: text("sender_role").notNull(), // WORKER | ADMIN
+  body: text("body").notNull(),
+  readAt: tsNull("read_at"),
   createdAt: ts("created_at"),
 });

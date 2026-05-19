@@ -3,6 +3,7 @@ import { workers, workerDocuments, trainingRecords } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { requireWorker } from "@/lib/auth";
 import { Card, Avatar, Chip, Meta, PageHeader, Stat } from "@/lib/ui";
+import { Uploader } from "@/components/Uploader";
 
 export default async function Profile() {
   const user = await requireWorker();
@@ -28,12 +29,20 @@ export default async function Profile() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1 space-y-6">
             <Card title="About me" subtitle={<Meta items={[w?.drivingLicence ? "Driver" : "No licence", w?.ownCar ? "Own car" : "No car"]} />}>
-              <div className="flex items-center gap-3 mb-4 pb-4" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                <Avatar name={`${user.firstName} ${user.lastName}`} className="w-12 h-12 text-base" />
+              <div className="flex items-center gap-3 mb-4" style={{}}>
+                <Avatar
+                  name={`${user.firstName} ${user.lastName}`}
+                  className="w-12 h-12 text-base"
+                  src={user.avatarDocId ? `/api/documents/${user.avatarDocId}` : null}
+                />
                 <div>
                   <div className="font-semibold">{user.firstName} {user.lastName}</div>
                   <div className="text-xs" style={{ color: "var(--text-muted)" }}>{user.email}</div>
                 </div>
+              </div>
+              <div className="mb-4 pb-4" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                <div className="h-section-title mb-2">Profile photo</div>
+                <Uploader fixedKind="AVATAR" accept=".png,.jpg,.jpeg,.webp,.heic" />
               </div>
               {types.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">

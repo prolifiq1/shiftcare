@@ -23,6 +23,7 @@ export type SessionUser = {
   id: string; agencyId: string; email: string;
   firstName: string; lastName: string; role: Role;
   emailVerified: boolean; mfaEnabled: boolean;
+  avatarDocId?: string | null;
   impersonatorId?: string | null;
 };
 
@@ -101,6 +102,7 @@ function toSessionUser(u: LocalUser, impersonatorId: string | null): SessionUser
     id: u.id, agencyId: u.agencyId, email: u.email,
     firstName: u.firstName, lastName: u.lastName, role: u.role as Role,
     emailVerified: !!u.emailVerifiedAt, mfaEnabled: false,
+    avatarDocId: u.avatarDocId ?? null,
     impersonatorId,
   };
 }

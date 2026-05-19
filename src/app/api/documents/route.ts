@@ -20,7 +20,8 @@ export async function POST(req: Request) {
   const form = await req.formData();
   const file = form.get("file") as File | null;
   const rawKind = String(form.get("kind") || "OTHER");
-  const kind = KIND_VALUES.includes(rawKind) ? rawKind : "OTHER";
+  const kind = rawKind === "AVATAR" ? "AVATAR" : KIND_VALUES.includes(rawKind) ? rawKind : "OTHER";
+  const isAvatar = kind === "AVATAR";
   const label = (String(form.get("label") || "").trim().slice(0, 120)) || null;
   const bookingId = (String(form.get("bookingId") || "").trim()) || null;
   const requestedWorkerId = (String(form.get("workerId") || "").trim()) || null;
@@ -52,6 +53,10 @@ export async function POST(req: Request) {
       "No file selected.";
     return Response.json({ error: msg }, { status: 400 });
   }
+  if (isAvatar && v.mime === "application/pdf") {
+    return Response.json({ error: "Profile photo must be an image." }, { status: 400 });
+  }
+  if (isAvatar) status = "APPROVED";
 
   const id = randomUUID();
   await db.insert(documents).values({
@@ -67,11 +72,18 @@ export async function POST(req: Request) {
     sizeBytes: v.size,
     contentBase64: v.buf.toString("base64"),
     status,
-    reviewedAt: onBehalf ? new Date() : null,
-    reviewedBy: onBehalf ? session.id : null,
+    reviewedAt: onBehalf || isAvatar ? new Date() : null,
+    reviewedBy: onBehalf || isAvatar ? session.id : null,
   }).run();
 
-  if (onBehalf) {
+  if (isAvatar) {
+    // Point the user at the new photo and clear out the previous one(s).
+    const prev = (await db.select().from(documents).where(and(eq(documents.workerId, workerId), eq(documents.kind, "AVATAR"))).all())
+      .filter((d) => d.id !== id);
+    await db.update(users).set({ avatarDocId: id }).where(eq(users.id, workerId)).run();
+    for (const p of prev) await db.delete(documents).where(eq(documents.id, p.id)).run();
+    await audit(session.id, session.agencyId, "avatar.update", { type: "user", id: workerId });
+  } else if (onBehalf) {
     await audit(session.id, session.agencyId, "document.admin_upload", { type: "document", id }, { kind });
     await notify(workerId, {
       type: "DOCUMENT_ADDED",
