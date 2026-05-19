@@ -4,6 +4,8 @@ import { and, desc, eq } from "drizzle-orm";
 import { requireAdmin, audit, notify } from "@/lib/auth";
 import { PageHeader, Card, Stat, StatusPill, Avatar, Chip, DataTable, EmptyState, Meta, Select, Field, Button } from "@/lib/ui";
 import { DOC_KINDS, MAX_UPLOAD_BYTES, kindLabel, humanSize } from "@/lib/documents";
+import { validateUpload } from "@/lib/upload";
+import { rateLimit } from "@/lib/ratelimit";
 import { notFound, redirect } from "next/navigation";
 import { randomUUID } from "crypto";
 import Link from "next/link";
@@ -14,12 +16,13 @@ async function adminUpload(formData: FormData) {
   const workerId = String(formData.get("workerId"));
   const target = await db.select().from(users).where(and(eq(users.id, workerId), eq(users.agencyId, admin.agencyId))).get();
   if (!target) redirect("/admin/workers");
+  if (!rateLimit(`upload:${admin.id}`, 40, 5 * 60_000)) redirect(`/admin/workers/${workerId}?derror=rate`);
   const file = formData.get("file") as File | null;
-  const kind = String(formData.get("kind") || "OTHER");
-  const label = String(formData.get("label") || "") || null;
-  if (!file || file.size === 0) redirect(`/admin/workers/${workerId}?derror=nofile`);
-  if (file!.size > MAX_UPLOAD_BYTES) redirect(`/admin/workers/${workerId}?derror=toobig`);
-  const buf = Buffer.from(await file!.arrayBuffer());
+  const rawKind = String(formData.get("kind") || "OTHER");
+  const kind = DOC_KINDS.map((k) => k.value as string).includes(rawKind) ? rawKind : "OTHER";
+  const label = (String(formData.get("label") || "").trim().slice(0, 120)) || null;
+  const v = await validateUpload(file);
+  if (!v.ok) redirect(`/admin/workers/${workerId}?derror=${v.error}`);
   await db.insert(documents).values({
     id: randomUUID(),
     agencyId: admin.agencyId,
@@ -27,10 +30,10 @@ async function adminUpload(formData: FormData) {
     uploadedBy: admin.id,
     kind,
     label,
-    fileName: file!.name,
-    mimeType: file!.type || "application/octet-stream",
-    sizeBytes: file!.size,
-    contentBase64: buf.toString("base64"),
+    fileName: v.fileName,
+    mimeType: v.mime,
+    sizeBytes: v.size,
+    contentBase64: v.buf.toString("base64"),
     status: "APPROVED", // uploaded by admin on the worker's behalf, already vetted
     reviewedAt: new Date(),
     reviewedBy: admin.id,
@@ -292,6 +295,16 @@ export default async function WorkerDetail({
               {sp.derror === "nofile" && (
                 <div className="px-5 pt-4 text-xs" style={{ color: "var(--status-danger-fg)" }}>
                   Pick a file to upload.
+                </div>
+              )}
+              {sp.derror === "type" && (
+                <div className="px-5 pt-4 text-xs" style={{ color: "var(--status-danger-fg)" }}>
+                  Unsupported file — PDF or image only.
+                </div>
+              )}
+              {sp.derror === "rate" && (
+                <div className="px-5 pt-4 text-xs" style={{ color: "var(--status-danger-fg)" }}>
+                  Too many uploads — wait a few minutes.
                 </div>
               )}
               {uploadedDocs.length === 0 ? (
