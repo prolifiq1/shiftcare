@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { workers, users, workerDocuments, trainingRecords, bookings, shifts, clients, locations, documents } from "@/lib/schema";
+import { workers, users, workerDocuments, trainingRecords, bookings, shifts, clients, locations, documents, timesheets } from "@/lib/schema";
 import { and, desc, eq } from "drizzle-orm";
 import { requireAdmin, audit, notify } from "@/lib/auth";
 import { PageHeader, Card, Stat, StatusPill, Avatar, Chip, DataTable, EmptyState, Meta, Select, Field, Button } from "@/lib/ui";
@@ -45,6 +45,46 @@ async function adminUpload(formData: FormData) {
   redirect(`/admin/workers/${workerId}?dok=1`);
 }
 
+async function setActive(formData: FormData) {
+  "use server";
+  const admin = await requireAdmin();
+  const workerId = String(formData.get("workerId"));
+  const active = String(formData.get("active")) === "true";
+  const target = await db.select().from(users).where(and(eq(users.id, workerId), eq(users.agencyId, admin.agencyId))).get();
+  if (!target) redirect("/admin/workers");
+  await db.update(users).set({ status: active ? "ACTIVE" : "INACTIVE" }).where(eq(users.id, workerId)).run();
+  await db.update(workers).set({ active }).where(eq(workers.id, workerId)).run();
+  await audit(admin.id, admin.agencyId, active ? "worker.reactivate" : "worker.deactivate", { type: "worker", id: workerId });
+  await notify(workerId, {
+    type: active ? "ACCOUNT_REACTIVATED" : "ACCOUNT_DEACTIVATED",
+    title: active ? "Your account is active again" : "Your account has been deactivated",
+    body: active ? "You can pick up shifts again." : "Contact the office if you think this is a mistake.",
+    href: "/worker",
+  });
+  redirect(`/admin/workers/${workerId}?st=${active ? "reactivated" : "deactivated"}`);
+}
+
+async function deleteWorker(formData: FormData) {
+  "use server";
+  const admin = await requireAdmin();
+  const workerId = String(formData.get("workerId"));
+  const confirm = String(formData.get("confirm") || "");
+  const target = await db.select().from(users).where(and(eq(users.id, workerId), eq(users.agencyId, admin.agencyId))).get();
+  if (!target) redirect("/admin/workers");
+  if (confirm !== "DELETE") redirect(`/admin/workers/${workerId}?st=confirm`);
+
+  // Cascade: remove the worker's dependent records within this agency.
+  await db.delete(timesheets).where(eq(timesheets.workerId, workerId)).run();
+  await db.delete(bookings).where(eq(bookings.workerId, workerId)).run();
+  await db.delete(documents).where(eq(documents.workerId, workerId)).run();
+  await db.delete(workerDocuments).where(eq(workerDocuments.workerId, workerId)).run();
+  await db.delete(trainingRecords).where(eq(trainingRecords.workerId, workerId)).run();
+  await db.delete(workers).where(eq(workers.id, workerId)).run();
+  await db.delete(users).where(and(eq(users.id, workerId), eq(users.agencyId, admin.agencyId))).run();
+  await audit(admin.id, admin.agencyId, "worker.delete", { type: "worker", id: workerId }, { email: target!.email });
+  redirect("/admin/workers?deleted=1");
+}
+
 function docTone(expiry: Date | null | undefined): { tone: string; label: string } {
   if (!expiry) return { tone: "var(--text-muted)", label: "No expiry" };
   const days = Math.floor((expiry.getTime() - Date.now()) / 86400000);
@@ -58,7 +98,7 @@ export default async function WorkerDetail({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ dok?: string; derror?: string }>;
+  searchParams: Promise<{ dok?: string; derror?: string; st?: string }>;
 }) {
   const admin = await requireAdmin();
   const { id } = await params;
@@ -138,6 +178,45 @@ export default async function WorkerDetail({
                 ) : (
                   <div className="text-sm" style={{ color: "var(--text-muted)" }}>None set.</div>
                 )}
+              </div>
+            </Card>
+
+            <Card title="Account">
+              {sp.st === "deactivated" && <div className="text-xs mb-3" style={{ color: "var(--status-warn-fg)" }}>Worker deactivated.</div>}
+              {sp.st === "reactivated" && <div className="text-xs mb-3" style={{ color: "var(--status-ok-fg)" }}>Worker reactivated.</div>}
+              {sp.st === "confirm" && <div className="text-xs mb-3" style={{ color: "var(--status-danger-fg)" }}>Type DELETE to confirm removal.</div>}
+              <div className="text-sm mb-3">
+                Status:{" "}
+                <strong style={{ color: u.status === "ACTIVE" ? "var(--status-ok-fg)" : "var(--status-danger-fg)" }}>
+                  {u.status}
+                </strong>
+              </div>
+              <div className="space-y-2">
+                <form action={setActive}>
+                  <input type="hidden" name="workerId" value={w.id} />
+                  <input type="hidden" name="active" value={u.status === "ACTIVE" ? "false" : "true"} />
+                  <Button
+                    type="submit"
+                    variant={u.status === "ACTIVE" ? "secondary" : "primary"}
+                    className="w-full"
+                  >
+                    {u.status === "ACTIVE" ? "Deactivate worker" : "Reactivate worker"}
+                  </Button>
+                </form>
+                <form action={deleteWorker} className="pt-2 border-t" style={{ borderColor: "var(--border-subtle)" }}>
+                  <input type="hidden" name="workerId" value={w.id} />
+                  <label className="h-label" style={{ marginTop: 8 }}>Permanently delete</label>
+                  <input
+                    name="confirm"
+                    placeholder="Type DELETE"
+                    className="h-field h-focus"
+                    autoComplete="off"
+                  />
+                  <div className="h-help">Removes the worker and all their bookings, timesheets and documents. Cannot be undone.</div>
+                  <Button type="submit" variant="danger" className="w-full" style={{ marginTop: 8 }}>
+                    Delete worker
+                  </Button>
+                </form>
               </div>
             </Card>
           </div>
