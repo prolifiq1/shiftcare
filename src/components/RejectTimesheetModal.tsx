@@ -71,7 +71,7 @@ export function RejectTimesheetModal({
               maxLength={500}
               placeholder="What is your reason?"
               className="h-field h-focus w-full"
-              style={{ minHeight: 110, resize: "vertical", textAlign: "left" }}
+              style={{ minHeight: 110, padding: "12px", resize: "vertical", textAlign: "left", lineHeight: "1.4" }}
               autoFocus
             />
             <div className="mt-5 grid grid-cols-2 gap-3">

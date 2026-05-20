@@ -382,6 +382,12 @@ html, body {
   box-shadow: var(--shadow-lg);
   padding: 0;
   max-width: 92vw;
+  max-height: 90vh;
+}
+.h-modal[open] {
+  position: fixed;
+  inset: 0;
+  margin: auto;
 }
 .h-modal::backdrop {
   background: rgba(15, 27, 27, 0.45);
