@@ -10,6 +10,7 @@ import { SignOutButton } from "@/components/SignOut";
 const NAV: { href: string; label: string; icon: string; group: string }[] = [
   { href: "/worker", label: "Available shifts", icon: "▤", group: "WORK" },
   { href: "/worker/schedule", label: "My schedule", icon: "⌘", group: "WORK" },
+  { href: "/worker/timesheets", label: "Timesheets", icon: "⏱", group: "WORK" },
   { href: "/worker/notifications", label: "Inbox", icon: "◎", group: "WORK" },
   { href: "/worker/messages", label: "Messages", icon: "✉", group: "WORK" },
   { href: "/worker/documents", label: "My documents", icon: "▢", group: "ACCOUNT" },
