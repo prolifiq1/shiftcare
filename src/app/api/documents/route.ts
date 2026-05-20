@@ -97,10 +97,10 @@ export async function POST(req: Request) {
       .filter((u) => ["AGENCY_ADMIN", "COORDINATOR", "COMPLIANCE"].includes(u.role));
     for (const a of admins) {
       await notify(a.id, {
-        type: "DOCUMENT_UPLOADED",
-        title: "New document to review",
+        type: kind === "TIMESHEET" ? "TIMESHEET_UPLOADED" : "DOCUMENT_UPLOADED",
+        title: kind === "TIMESHEET" ? "New timesheet to review" : "New document to review",
         body: `${session.firstName} ${session.lastName} uploaded ${kindLabel(kind)}.`,
-        href: "/admin/documents",
+        href: kind === "TIMESHEET" ? "/admin/timesheets" : "/admin/documents",
       });
     }
   }

@@ -1,8 +1,10 @@
 import { db } from "@/lib/db";
 import { timesheets, bookings, shifts, clients, documents } from "@/lib/schema";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { requireWorker } from "@/lib/auth";
 import { PageHeader, Card, Stat, StatusPill, DataTable, EmptyState, Banner, Money } from "@/lib/ui";
+import { Uploader, DeleteDoc } from "@/components/Uploader";
+import { humanSize } from "@/lib/documents";
 import Link from "next/link";
 
 // Map internal DISPUTED status to a clearer "REJECTED" label for the worker.
@@ -41,7 +43,14 @@ export default async function WorkerTimesheets() {
     .from(documents)
     .where(and(eq(documents.workerId, user.id), eq(documents.kind, "TIMESHEET")))
     .all();
-  const docByBooking = new Map(tsDocs.map((d) => [d.bookingId ?? "", d]));
+  const docByBooking = new Map(tsDocs.filter((d) => d.bookingId).map((d) => [d.bookingId ?? "", d]));
+  // Standalone timesheet uploads (not tied to a booking).
+  const standaloneUploads = await db
+    .select()
+    .from(documents)
+    .where(and(eq(documents.workerId, user.id), eq(documents.kind, "TIMESHEET"), isNull(documents.bookingId)))
+    .orderBy(desc(documents.createdAt))
+    .all();
 
   // Timesheets that need re-submission (rejected by the office).
   const rejected = rows.filter((r) => r.t.status === "DISPUTED");
@@ -55,6 +64,50 @@ export default async function WorkerTimesheets() {
         subtitle={`${rows.length} submitted · ${approved} approved · ${submitted} awaiting review · ${rejected.length} need attention`}
       />
       <div className="p-8 space-y-6 max-w-5xl">
+        <Card
+          title="Upload a timesheet"
+          subtitle="Send a signed timesheet (photo or PDF) to the office for approval. You can also use this for shifts that aren’t in the system."
+        >
+          <Uploader fixedKind="TIMESHEET" accept=".pdf,.png,.jpg,.jpeg,.webp,.heic" />
+        </Card>
+
+        {standaloneUploads.length > 0 && (
+          <Card title={`Uploaded timesheet files (${standaloneUploads.length})`} padded={false}>
+            <table className="h-table">
+              <thead>
+                <tr>
+                  <th>File</th>
+                  <th>Uploaded</th>
+                  <th>Size</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {standaloneUploads.map((d) => (
+                  <tr key={d.id}>
+                    <td>
+                      <a className="h-link" href={`/api/documents/${d.id}`} target="_blank" rel="noreferrer">{d.fileName}</a>
+                      {d.label && <div className="text-xs" style={{ color: "var(--text-muted)" }}>{d.label}</div>}
+                    </td>
+                    <td className="h-num text-xs" style={{ color: "var(--text-muted)" }}>{d.createdAt?.toISOString().slice(0, 10)}</td>
+                    <td className="h-num text-xs">{humanSize(d.sizeBytes)}</td>
+                    <td>
+                      <StatusPill status={d.status} />
+                      {d.status === "REJECTED" && d.reviewNote && (
+                        <div className="text-xs mt-1" style={{ color: "var(--status-danger-fg)" }}>{d.reviewNote}</div>
+                      )}
+                    </td>
+                    <td className="text-right">
+                      <DeleteDoc id={d.id} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        )}
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Stat label="Submitted" value={rows.length} />
           <Stat label="Approved" value={approved} />
