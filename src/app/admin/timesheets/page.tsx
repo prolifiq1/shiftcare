@@ -27,16 +27,18 @@ async function dispute(formData: FormData) {
   "use server";
   const user = await requireAdmin();
   const id = String(formData.get("id"));
-  const reason = String(formData.get("reason") || "Please review hours.");
+  const reason = (String(formData.get("reason") || "").trim().slice(0, 500)) || "Please review the hours and resubmit.";
   const ts = (await db.select().from(timesheets).where(eq(timesheets.id, id)).get());
   if (!ts) return;
   (await db.update(timesheets).set({ status: "DISPUTED", disputeReason: reason }).where(eq(timesheets.id, id)).run());
-  await audit(user.id, user.agencyId, "timesheet.dispute", { type: "timesheet", id }, { reason });
+  // Re-open the booking so the worker can resubmit cleanly.
+  (await db.update(bookings).set({ status: "CHECKED_OUT" }).where(eq(bookings.id, ts.bookingId)).run());
+  await audit(user.id, user.agencyId, "timesheet.reject", { type: "timesheet", id }, { reason });
   await notify(ts.workerId, {
-    type: "TIMESHEET_DISPUTED",
-    title: "Timesheet needs attention",
+    type: "TIMESHEET_REJECTED",
+    title: "Timesheet rejected — please resubmit",
     body: reason,
-    href: "/worker/schedule",
+    href: "/worker/timesheets",
   });
   redirect("/admin/timesheets");
 }
@@ -68,7 +70,7 @@ export default async function Timesheets({ searchParams }: { searchParams: Promi
   const tabs = [
     { key: "submitted", label: "To approve", href: "/admin/timesheets?tab=submitted", count: filter(["SUBMITTED"]).length },
     { key: "approved", label: "Approved", href: "/admin/timesheets?tab=approved", count: filter(["APPROVED"]).length },
-    { key: "disputed", label: "Disputed", href: "/admin/timesheets?tab=disputed", count: filter(["DISPUTED"]).length },
+    { key: "disputed", label: "Rejected", href: "/admin/timesheets?tab=disputed", count: filter(["DISPUTED"]).length },
     { key: "all", label: "All", href: "/admin/timesheets?tab=all", count: base.length },
   ];
   const groupMap: Record<string, string[]> = {
@@ -120,7 +122,7 @@ export default async function Timesheets({ searchParams }: { searchParams: Promi
                   <td className="h-num font-medium">{(t.workedMinutes / 60).toFixed(2)}</td>
                   <td className="h-num"><Money amount={t.totalPay} /></td>
                   <td>
-                    <StatusPill status={t.status} />
+                    <StatusPill status={t.status === "DISPUTED" ? "REJECTED" : t.status} />
                     {docByBooking.get(t.bookingId) && (
                       <a
                         className="h-link text-xs block mt-1"
@@ -131,19 +133,40 @@ export default async function Timesheets({ searchParams }: { searchParams: Promi
                         View signed sheet →
                       </a>
                     )}
+                    {t.status === "DISPUTED" && t.disputeReason && (
+                      <div className="text-xs mt-1" style={{ color: "var(--status-danger-fg)" }}>
+                        {t.disputeReason}
+                      </div>
+                    )}
                   </td>
-                  <td className="text-right">
+                  <td className="text-right" style={{ minWidth: 280 }}>
                     {t.status === "SUBMITTED" && (
-                      <div className="inline-flex gap-2">
+                      <div className="flex flex-col items-end gap-2">
                         <form action={approve}>
                           <input type="hidden" name="id" value={t.id} />
                           <Button size="sm" type="submit">Approve</Button>
                         </form>
-                        <form action={dispute}>
-                          <input type="hidden" name="id" value={t.id} />
-                          <input type="hidden" name="reason" value="Please review the hours and resubmit." />
-                          <Button size="sm" variant="ghost" type="submit">Dispute</Button>
-                        </form>
+                        <details className="w-full max-w-[280px]">
+                          <summary
+                            className="cursor-pointer h-btn h-btn-ghost h-btn-sm w-full text-center"
+                            style={{ display: "inline-block" }}
+                          >
+                            Reject…
+                          </summary>
+                          <form action={dispute} className="mt-2 flex flex-col gap-2">
+                            <input type="hidden" name="id" value={t.id} />
+                            <textarea
+                              name="reason"
+                              rows={2}
+                              required
+                              maxLength={500}
+                              placeholder="Reason for rejection (the worker will see this)"
+                              className="h-field h-focus"
+                              style={{ minHeight: 64, resize: "vertical", textAlign: "left" }}
+                            />
+                            <Button size="sm" variant="danger" type="submit">Send rejection</Button>
+                          </form>
+                        </details>
                       </div>
                     )}
                   </td>
