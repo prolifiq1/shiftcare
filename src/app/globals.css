@@ -372,3 +372,18 @@ html, body {
   display: none;
 }
 @media (min-width: 1024px) { .h-auth-aside { display: flex; } }
+
+/* Modal dialog */
+.h-modal {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-large);
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-lg);
+  padding: 0;
+  max-width: 92vw;
+}
+.h-modal::backdrop {
+  background: rgba(15, 27, 27, 0.45);
+  backdrop-filter: blur(2px);
+}
