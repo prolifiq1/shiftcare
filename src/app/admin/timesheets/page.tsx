@@ -153,17 +153,22 @@ export default async function Timesheets({ searchParams }: { searchParams: Promi
                         <div className="text-xs mt-1" style={{ color: "var(--status-danger-fg)" }}>{d.reviewNote}</div>
                       )}
                     </td>
-                    <td className="text-right" style={{ minWidth: 280 }}>
+                    <td className="text-right align-top" style={{ minWidth: 280 }}>
                       {d.status === "PENDING" ? (
-                        <div className="flex flex-col items-end gap-2">
+                        <div className="inline-flex items-start justify-end gap-2">
                           <form action={reviewUpload}>
                             <input type="hidden" name="id" value={d.id} />
                             <input type="hidden" name="decision" value="approve" />
                             <Button size="sm" type="submit">Approve</Button>
                           </form>
-                          <details className="w-full max-w-[280px]">
-                            <summary className="cursor-pointer h-btn h-btn-ghost h-btn-sm w-full text-center">Reject…</summary>
-                            <form action={reviewUpload} className="mt-2 flex flex-col gap-2">
+                          <details className="text-left">
+                            <summary
+                              className="cursor-pointer list-none [&::-webkit-details-marker]:hidden h-btn h-btn-ghost h-btn-sm"
+                              style={{ listStyle: "none" }}
+                            >
+                              Reject…
+                            </summary>
+                            <form action={reviewUpload} className="mt-2 flex flex-col gap-2 items-end" style={{ minWidth: 260 }}>
                               <input type="hidden" name="id" value={d.id} />
                               <input type="hidden" name="decision" value="reject" />
                               <textarea
@@ -172,7 +177,7 @@ export default async function Timesheets({ searchParams }: { searchParams: Promi
                                 required
                                 maxLength={500}
                                 placeholder="Reason for rejection (the worker will see this)"
-                                className="h-field h-focus"
+                                className="h-field h-focus w-full"
                                 style={{ minHeight: 64, resize: "vertical", textAlign: "left" }}
                               />
                               <Button size="sm" variant="danger" type="submit">Send rejection</Button>
@@ -247,21 +252,21 @@ export default async function Timesheets({ searchParams }: { searchParams: Promi
                       </div>
                     )}
                   </td>
-                  <td className="text-right" style={{ minWidth: 280 }}>
+                  <td className="text-right align-top" style={{ minWidth: 280 }}>
                     {t.status === "SUBMITTED" && (
-                      <div className="flex flex-col items-end gap-2">
+                      <div className="inline-flex items-start justify-end gap-2">
                         <form action={approve}>
                           <input type="hidden" name="id" value={t.id} />
                           <Button size="sm" type="submit">Approve</Button>
                         </form>
-                        <details className="w-full max-w-[280px]">
+                        <details className="text-left">
                           <summary
-                            className="cursor-pointer h-btn h-btn-ghost h-btn-sm w-full text-center"
-                            style={{ display: "inline-block" }}
+                            className="cursor-pointer list-none [&::-webkit-details-marker]:hidden h-btn h-btn-ghost h-btn-sm"
+                            style={{ listStyle: "none" }}
                           >
                             Reject…
                           </summary>
-                          <form action={dispute} className="mt-2 flex flex-col gap-2">
+                          <form action={dispute} className="mt-2 flex flex-col gap-2 items-end" style={{ minWidth: 260 }}>
                             <input type="hidden" name="id" value={t.id} />
                             <textarea
                               name="reason"
@@ -269,7 +274,7 @@ export default async function Timesheets({ searchParams }: { searchParams: Promi
                               required
                               maxLength={500}
                               placeholder="Reason for rejection (the worker will see this)"
-                              className="h-field h-focus"
+                              className="h-field h-focus w-full"
                               style={{ minHeight: 64, resize: "vertical", textAlign: "left" }}
                             />
                             <Button size="sm" variant="danger" type="submit">Send rejection</Button>
