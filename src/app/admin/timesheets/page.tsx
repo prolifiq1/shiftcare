@@ -4,6 +4,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { requireAdmin, audit, notify } from "@/lib/auth";
 import { PageHeader, Tabs, DataTable, EmptyState, Avatar, StatusPill, Button, Money, Card } from "@/lib/ui";
 import { humanSize } from "@/lib/documents";
+import { RejectTimesheetModal } from "@/components/RejectTimesheetModal";
 import { redirect } from "next/navigation";
 
 async function approve(formData: FormData) {
@@ -155,34 +156,18 @@ export default async function Timesheets({ searchParams }: { searchParams: Promi
                     </td>
                     <td className="text-right align-top" style={{ minWidth: 280 }}>
                       {d.status === "PENDING" ? (
-                        <div className="inline-flex items-start justify-end gap-2">
+                        <div className="inline-flex items-center justify-end gap-2">
                           <form action={reviewUpload}>
                             <input type="hidden" name="id" value={d.id} />
                             <input type="hidden" name="decision" value="approve" />
                             <Button size="sm" type="submit">Approve</Button>
                           </form>
-                          <details className="text-left">
-                            <summary
-                              className="cursor-pointer list-none [&::-webkit-details-marker]:hidden h-btn h-btn-ghost h-btn-sm"
-                              style={{ listStyle: "none" }}
-                            >
-                              Reject…
-                            </summary>
-                            <form action={reviewUpload} className="mt-2 flex flex-col gap-2 items-end" style={{ minWidth: 260 }}>
-                              <input type="hidden" name="id" value={d.id} />
-                              <input type="hidden" name="decision" value="reject" />
-                              <textarea
-                                name="note"
-                                rows={2}
-                                required
-                                maxLength={500}
-                                placeholder="Reason for rejection (the worker will see this)"
-                                className="h-field h-focus w-full"
-                                style={{ minHeight: 64, resize: "vertical", textAlign: "left" }}
-                              />
-                              <Button size="sm" variant="danger" type="submit">Send rejection</Button>
-                            </form>
-                          </details>
+                          <RejectTimesheetModal
+                            action={reviewUpload}
+                            hiddenFields={{ id: d.id, decision: "reject" }}
+                            reasonField="note"
+                            subtitle="Are you sure you want to reject this uploaded timesheet?"
+                          />
                         </div>
                       ) : (
                         <a className="h-link text-xs" href={`/api/documents/${d.id}`} target="_blank" rel="noreferrer">View →</a>
@@ -254,32 +239,16 @@ export default async function Timesheets({ searchParams }: { searchParams: Promi
                   </td>
                   <td className="text-right align-top" style={{ minWidth: 280 }}>
                     {t.status === "SUBMITTED" && (
-                      <div className="inline-flex items-start justify-end gap-2">
+                      <div className="inline-flex items-center justify-end gap-2">
                         <form action={approve}>
                           <input type="hidden" name="id" value={t.id} />
                           <Button size="sm" type="submit">Approve</Button>
                         </form>
-                        <details className="text-left">
-                          <summary
-                            className="cursor-pointer list-none [&::-webkit-details-marker]:hidden h-btn h-btn-ghost h-btn-sm"
-                            style={{ listStyle: "none" }}
-                          >
-                            Reject…
-                          </summary>
-                          <form action={dispute} className="mt-2 flex flex-col gap-2 items-end" style={{ minWidth: 260 }}>
-                            <input type="hidden" name="id" value={t.id} />
-                            <textarea
-                              name="reason"
-                              rows={2}
-                              required
-                              maxLength={500}
-                              placeholder="Reason for rejection (the worker will see this)"
-                              className="h-field h-focus w-full"
-                              style={{ minHeight: 64, resize: "vertical", textAlign: "left" }}
-                            />
-                            <Button size="sm" variant="danger" type="submit">Send rejection</Button>
-                          </form>
-                        </details>
+                        <RejectTimesheetModal
+                          action={dispute}
+                          hiddenFields={{ id: t.id }}
+                          reasonField="reason"
+                        />
                       </div>
                     )}
                   </td>
